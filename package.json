@@ -1,0 +1,32 @@
+{
+  "name": "pi-statusline",
+  "version": "0.1.0",
+  "description": "Theme-adaptive statusline extension for pi coding agent",
+  "type": "module",
+  "private": true,
+  "keywords": [
+    "pi-package",
+    "pi",
+    "coding-agent",
+    "statusline",
+    "extension"
+  ],
+  "license": "MIT",
+  "files": [
+    "*.ts",
+    "*.md",
+    "*.json"
+  ],
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "devDependencies": {
+    "@earendil-works/pi-ai": "^0.83.0",
+    "@earendil-works/pi-coding-agent": "^0.83.0",
+    "@earendil-works/pi-tui": "^0.83.0",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.5.0"
+  }
+}
