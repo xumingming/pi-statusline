@@ -2,7 +2,9 @@
  * pi-statusline — compact one-line statusline for pi.
  *
  * Forked from @wierdbytes/pi-statusline (MIT), trimmed to the rendering
- * core: model/thinking, path, git, context, cost, tokens. Colors are
+ * core: model/thinking, path, git, context, cost, tokens — plus two
+ * Kimi subscription usage bars shown when a Kimi model is active.
+ * Colors are
  * derived from the active pi theme at render time (see blocks.ts), so
  * the statusline follows `/theme` switches and custom user themes.
  *
@@ -38,6 +40,7 @@ import {
 } from "./blocks.ts";
 import { getGitStatus, invalidateGitStatus } from "./git-status.ts";
 import { DEFAULT_ICON_SET, isIconSet, type IconSet } from "./icons.ts";
+import { getKimiUsage, onKimiUsageUpdate } from "./kimi-usage.ts";
 import { cloneDefaultLayout, normaliseLayoutConfig, type LayoutConfig } from "./layout-config.ts";
 
 const PROMPT_PADDING = 0;
@@ -126,6 +129,9 @@ function renderStatusContent(
   const git = getGitStatus(ctx.cwd);
 
   const model = ctx.model as Model<any> | undefined;
+  const isKimi =
+    typeof model?.provider === "string" &&
+    model.provider.toLowerCase().includes("kimi");
   const inputs: RenderInputs = {
     palette,
     cwd: ctx.cwd,
@@ -142,6 +148,7 @@ function renderStatusContent(
     totalOutput: stats.totalOutput,
     totalCacheRead: stats.totalCacheRead,
     totalCacheWrite: stats.totalCacheWrite,
+    kimiUsage: isKimi ? getKimiUsage() : null,
     iconSet: config.iconSet,
     layout: config.layout,
   };
@@ -212,6 +219,9 @@ export default function (pi: ExtensionAPI) {
   let activeTui: TUI | undefined;
   let config: StatuslineConfig = loadConfig();
 
+  // Repaint when a fresh Kimi usage snapshot lands in the background.
+  onKimiUsageUpdate(() => activeTui?.requestRender());
+
   pi.on("session_start", async (_event, ctx) => {
     if (!ctx.hasUI) return;
     config = loadConfig();
@@ -250,6 +260,11 @@ export default function (pi: ExtensionAPI) {
   });
 
   pi.on("thinking_level_select", async () => {
+    activeTui?.requestRender();
+  });
+
+  // Switching to/from a Kimi model toggles the usage blocks.
+  pi.on("model_select", async () => {
     activeTui?.requestRender();
   });
 }

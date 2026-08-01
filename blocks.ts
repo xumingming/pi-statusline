@@ -7,8 +7,10 @@
  *      (see `paletteFromTheme`) instead of hardcoded Tokyo Night Storm
  *      ANSI constants, so the statusline follows `/theme` switches.
  *   2. Trimmed to the core blocks: model, path, git, context, cost,
- *      tokens. The notify-chips and stash blocks (which depended on
- *      the events bus / stash feature of the original) are dropped.
+ *      tokens — plus two Kimi subscription usage bars (kimi-5h,
+ *      kimi-weekly) fed by kimi-usage.ts. The notify-chips and stash
+ *      blocks (which depended on the events bus / stash feature of
+ *      the original) are dropped.
  *
  * Each `BlockRenderer` is a pure function that turns the shared
  * `RenderInputs` bundle into an ANSI string with **no leading or
@@ -25,6 +27,7 @@ import type { Theme } from "@earendil-works/pi-coding-agent";
 import { basename, dirname } from "node:path";
 
 import { resolveIcon, type IconSet } from "./icons.ts";
+import type { KimiWindowUsage, KimiUsageSnapshot } from "./kimi-usage.ts";
 import type { LayoutConfig } from "./layout-config.ts";
 
 // ─────────────────────────────────────────────────────────────────────
@@ -176,6 +179,8 @@ export const KNOWN_BLOCK_IDS = [
   "path",
   "git",
   "context",
+  "kimi-5h",
+  "kimi-weekly",
   "cost",
   "tokens",
 ] as const;
@@ -202,6 +207,9 @@ export interface RenderInputs {
   totalOutput: number;
   totalCacheRead: number;
   totalCacheWrite: number;
+  /** Kimi subscription usage windows; null when the active model is
+   *  not served by Kimi or no snapshot has loaded yet. */
+  kimiUsage: KimiUsageSnapshot | null;
   iconSet: IconSet;
   layout: LayoutConfig;
 }
@@ -266,6 +274,37 @@ const renderContext: BlockRenderer = (inputs) => {
   );
 };
 
+/**
+ * Shared renderer for the Kimi usage-window blocks: a dim label, the
+ * used percentage colored by fill level, and a progress bar. Returns
+ * "" when the window has no usable data.
+ */
+function renderUsageWindow(row: KimiWindowUsage, palette: Palette): string {
+  const p = palette;
+  if (row.limit <= 0) return `${p.GRAY}${row.label} ${row.used}${p.RESET}`;
+  const pct = Math.min(100, Math.floor((Math.max(0, row.used) * 100) / row.limit));
+  const color = pctColorFor(pct, p);
+  const bar = buildBar(pct, color, p);
+  return (
+    `${p.GRAY}${row.label}${p.RESET} ${color}${pct}%${p.RESET} ` +
+    `${p.GRAY}[${p.RESET}${bar}${p.GRAY}]${p.RESET}`
+  );
+}
+
+/** `kimi-5h` block — current short rate-limit window (typically 5h). */
+const renderKimiFiveHour: BlockRenderer = (inputs) => {
+  const row = inputs.kimiUsage?.fiveHour;
+  if (!row) return "";
+  return renderUsageWindow(row, inputs.palette);
+};
+
+/** `kimi-weekly` block — current weekly quota window. */
+const renderKimiWeekly: BlockRenderer = (inputs) => {
+  const row = inputs.kimiUsage?.weekly;
+  if (!row) return "";
+  return renderUsageWindow(row, inputs.palette);
+};
+
 /** `cost` block — session total in USD; empty when zero. */
 const renderCost: BlockRenderer = (inputs) => {
   const p = inputs.palette;
@@ -297,6 +336,8 @@ export const BLOCK_RENDERERS: Record<BlockId, BlockRenderer> = {
   path: renderPath,
   git: renderGit,
   context: renderContext,
+  "kimi-5h": renderKimiFiveHour,
+  "kimi-weekly": renderKimiWeekly,
   cost: renderCost,
   tokens: renderTokens,
 };

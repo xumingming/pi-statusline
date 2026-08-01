@@ -10,7 +10,7 @@ Renders a compact one-line status row above the editor, with the editor's
 top/bottom borders stripped so the two visually merge:
 
 ```
-─ 🤖 Kimi K3 🧠 high │ …/abei/Code/spark │ master ✓ │ 12%: 127k[▓░░░░░░░░░]893k │ $2.02 │ ↑639k ↓88k R6.3M
+─ 🤖 Kimi K3 🧠 high │ …/abei/Code/spark │ master ✓ │ 12%: 127k[▓░░░░░░░░░]893k │ 5h 43%[▓▓▓▓░░░░░░] │ wk 9%[▓░░░░░░░░░] │ $2.02 │ ↑639k ↓88k R6.3M
 ```
 
 Blocks (left to right, all auto-hide when irrelevant):
@@ -23,6 +23,10 @@ Blocks (left to right, all auto-hide when irrelevant):
 - **Context** — percentage of the usable context window before
   autocompaction (33k buffer reserved), with a progress bar that shifts
   success → warning → error as it fills.
+- **Kimi 5h / Kimi weekly** — Kimi Coding subscription quota windows
+  (short rate-limit window and weekly window), shown only when the
+  active model is served by Kimi. Polled from the `/usages` API once a
+  minute using the `kimi-coding` OAuth token from `~/.pi/agent/auth.json`.
 - **Cost** — session total in USD when greater than zero.
 - **Tokens** — cumulative `↑input ↓output R{cacheRead} W{cacheWrite}`.
 
@@ -69,7 +73,7 @@ restart pi after edits):
 {
   "iconSet": "nerd-font",
   "layout": {
-    "order": ["model", "path", "git", "context", "cost", "tokens"],
+    "order": ["model", "path", "git", "context", "kimi-5h", "kimi-weekly", "cost", "tokens"],
     "enabled": { "cost": false },
     "separator": "│",
     "model": { "showThinking": true },
@@ -87,5 +91,5 @@ and missing ones appended.
 ```bash
 npm install
 npx tsc --noEmit        # typecheck
-node --test test/       # unit tests
+node --test             # unit tests
 ```

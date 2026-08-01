@@ -54,6 +54,7 @@ function makeInputs(overrides: Partial<RenderInputs> = {}): RenderInputs {
     totalOutput: 88000,
     totalCacheRead: 6300000,
     totalCacheWrite: 0,
+    kimiUsage: null,
     iconSet: "ascii",
     layout: cloneDefaultLayout(),
     ...overrides,
@@ -151,6 +152,50 @@ test("thinking segment hidden for non-reasoning models or when toggled off", () 
   const toggled = normaliseLayoutConfig({ model: { showThinking: false } });
   const off = composeStatusLine(toggled, makeInputs({ layout: toggled }));
   assert.ok(!off.includes("<thinkHigh>"), "thinking sub-toggle off");
+});
+
+test("kimi usage blocks hidden without a snapshot, shown with data", () => {
+  const layout = cloneDefaultLayout();
+  const hidden = composeStatusLine(layout, makeInputs());
+  assert.ok(!hidden.includes("5h"), "no 5h block without usage data");
+  assert.ok(!hidden.includes("wk"), "no weekly block without usage data");
+
+  const usage = {
+    weekly: { label: "wk", used: 9, limit: 100 },
+    fiveHour: { label: "5h", used: 43, limit: 100 },
+  };
+  const line = composeStatusLine(layout, makeInputs({ kimiUsage: usage }));
+  assert.ok(line.includes("<gray>5h</> <success>43%</>"), "5h block with low fill");
+  assert.ok(line.includes("<gray>wk</> <success>9%</>"), "weekly block with low fill");
+  assert.ok(line.includes("\u2593"), "progress bar rendered");
+});
+
+test("kimi usage bars shift success -> warning -> error with fill level", () => {
+  const layout = cloneDefaultLayout();
+  const at = (used: number) =>
+    composeStatusLine(
+      layout,
+      makeInputs({
+        kimiUsage: { weekly: { label: "wk", used, limit: 100 }, fiveHour: null },
+      }),
+    );
+
+  assert.ok(at(50).includes("<success>50%"), "low fill is success-colored");
+  assert.ok(at(70).includes("<warning>70%"), "mid fill is warning-colored");
+  assert.ok(at(90).includes("<error>90%"), "high fill is error-colored");
+});
+
+test("kimi usage blocks can be disabled via layout", () => {
+  const layout = normaliseLayoutConfig({
+    enabled: { "kimi-5h": false, "kimi-weekly": false } as Record<BlockId, boolean>,
+  });
+  const usage = {
+    weekly: { label: "wk", used: 9, limit: 100 },
+    fiveHour: { label: "5h", used: 43, limit: 100 },
+  };
+  const line = composeStatusLine(layout, makeInputs({ kimiUsage: usage, layout }));
+  assert.ok(!line.includes("43%"), "5h block disabled");
+  assert.ok(!line.includes("9%"), "weekly block disabled");
 });
 
 test("format helpers", () => {

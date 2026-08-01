@@ -67,6 +67,8 @@ export const DEFAULT_LAYOUT_CONFIG: LayoutConfig = Object.freeze({
     path: true,
     git: true,
     context: true,
+    "kimi-5h": true,
+    "kimi-weekly": true,
     cost: true,
     tokens: true,
   }) as Record<BlockId, boolean>,
