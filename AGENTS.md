@@ -48,6 +48,22 @@ indent, double quotes, semicolons, JSDoc on exported symbols).
 - **Tests**: add the test first when fixing a bug; verify it fails
   before applying the fix.
 
+## Distribution (git-sourced install)
+
+This machine's pi loads the extension from the GitHub remote, not the
+working tree: `~/.pi/agent/settings.json` points at
+`git:github.com/xumingming/pi-statusline`, and pi keeps a managed
+clone in `~/.pi/agent/git/github.com/xumingming/pi-statusline`.
+
+- **Update workflow**: after changing code — commit, push,
+  `pi update --extensions`, restart pi. Plain `pi update` skips
+  extensions; the `--extensions` flag is required. The managed clone
+  is hard-reset + cleaned on update, so never edit it directly.
+- **The dev copy is disconnected**: edits in `~/Code/pi-statusline`
+  do not affect the running extension until pushed and updated. For
+  live development, temporarily swap the settings entry back to
+  `"~/Code/pi-statusline"` and restart pi.
+
 ## Sensitive Information Check (required before every commit)
 
 This project handles Kimi OAuth credentials **at runtime only** —
