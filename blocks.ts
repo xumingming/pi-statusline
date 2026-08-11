@@ -298,11 +298,32 @@ const renderKimiFiveHour: BlockRenderer = (inputs) => {
   return renderUsageWindow(row, inputs.palette);
 };
 
-/** `kimi-weekly` block — current weekly quota window. */
+/**
+ * Format a weekly-window reset instant as local `MM-DD HH:mm`.
+ * Returns "" when the payload carried no (or an unparseable)
+ * resetTime, so the block silently keeps its bar-only shape.
+ */
+function formatResetTime(resetTime: string | undefined): string {
+  if (!resetTime) return "";
+  const ms = new Date(resetTime).getTime();
+  if (Number.isNaN(ms)) return "";
+  const d = new Date(ms);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return (
+    `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ` +
+    `${pad(d.getHours())}:${pad(d.getMinutes())}`
+  );
+}
+
+/** `kimi-weekly` block — weekly quota window plus its end time. */
 const renderKimiWeekly: BlockRenderer = (inputs) => {
   const row = inputs.kimiUsage?.weekly;
   if (!row) return "";
-  return renderUsageWindow(row, inputs.palette);
+  const p = inputs.palette;
+  const base = renderUsageWindow(row, p);
+  const reset = formatResetTime(row.resetTime);
+  if (!reset) return base;
+  return `${base} ${p.GRAY}ends ${reset}${p.RESET}`;
 };
 
 /** `cost` block — session total in USD; empty when zero. */

@@ -185,6 +185,45 @@ test("kimi usage bars shift success -> warning -> error with fill level", () => 
   assert.ok(at(90).includes("<error>90%"), "high fill is error-colored");
 });
 
+test("kimi weekly block shows when the window ends", () => {
+  const layout = cloneDefaultLayout();
+  const resetTime = "2026-08-15T07:01:18.219288Z";
+  const d = new Date(resetTime);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const expected =
+    `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ` +
+    `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+
+  const usage = {
+    weekly: { label: "wk", used: 9, limit: 100, resetTime },
+    fiveHour: null,
+  };
+  const line = composeStatusLine(layout, makeInputs({ kimiUsage: usage }));
+  assert.ok(
+    line.includes(`<gray>ends ${expected}</>`),
+    "weekly block shows local reset time",
+  );
+
+  const noReset = composeStatusLine(
+    layout,
+    makeInputs({
+      kimiUsage: { weekly: { label: "wk", used: 9, limit: 100 }, fiveHour: null },
+    }),
+  );
+  assert.ok(!noReset.includes("ends"), "no ends segment without resetTime");
+
+  const badReset = composeStatusLine(
+    layout,
+    makeInputs({
+      kimiUsage: {
+        weekly: { label: "wk", used: 9, limit: 100, resetTime: "not-a-date" },
+        fiveHour: null,
+      },
+    }),
+  );
+  assert.ok(!badReset.includes("ends"), "no ends segment for invalid resetTime");
+});
+
 test("kimi usage blocks can be disabled via layout", () => {
   const layout = normaliseLayoutConfig({
     enabled: { "kimi-5h": false, "kimi-weekly": false } as Record<BlockId, boolean>,
