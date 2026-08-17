@@ -71,6 +71,7 @@ export const DEFAULT_LAYOUT_CONFIG: LayoutConfig = Object.freeze({
     "kimi-weekly": true,
     cost: true,
     tokens: true,
+    throughput: true,
   }) as Record<BlockId, boolean>,
   model: Object.freeze({ showThinking: true }) as ModelSubToggles,
   tokens: Object.freeze({

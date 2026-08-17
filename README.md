@@ -29,6 +29,11 @@ Blocks (left to right, all auto-hide when irrelevant):
   minute using the `kimi-coding` OAuth token from `~/.pi/agent/auth.json`.
 - **Cost** — session total in USD when greater than zero.
 - **Tokens** — cumulative `↑input ↓output R{cacheRead} W{cacheWrite}`.
+- **Throughput** — output tokens/sec. While a response streams this is
+  a live estimate from streamed text length (marked `~`, cyan) since
+  providers only report usage at the end; once the response finishes
+  the real `usage.output` over the streaming time is shown (dim) until
+  the next response starts.
 
 ## What changed vs. the original
 
@@ -47,11 +52,11 @@ Blocks (left to right, all auto-hide when irrelevant):
 | `ERROR` | `error` | dirty git marker, context bar > 80% |
 | `WARNING` | `warning` | context bar > 60% |
 | `SUCCESS` | `success` | clean git marker, context bar ≤ 60% |
-| `CYAN` | `syntaxType` | git branch |
+| `CYAN` | `syntaxType` | git branch, live throughput |
 | `BLUE` | `syntaxKeyword` | (reserved) |
 | `PURPLE` | `customMessageLabel` | current directory |
 | `ACCENT` | `accent` | model name |
-| `GRAY` | `dim` | separators, path parents, cost, tokens |
+| `GRAY` | `dim` | separators, path parents, cost, tokens, settled throughput |
 | `THINK.*` | `thinkingOff`…`thinkingMax` | thinking-level segment |
 
 ## Install
@@ -73,7 +78,7 @@ restart pi after edits):
 {
   "iconSet": "nerd-font",
   "layout": {
-    "order": ["model", "path", "git", "context", "kimi-5h", "kimi-weekly", "cost", "tokens"],
+    "order": ["model", "path", "git", "context", "kimi-5h", "kimi-weekly", "cost", "tokens", "throughput"],
     "enabled": { "cost": false },
     "separator": "│",
     "model": { "showThinking": true },

@@ -44,7 +44,8 @@ export type IconKey =
   | "warning"
   | "error"
   | "scheduled"
-  | "agents";
+  | "agents"
+  | "throughput";
 
 /** Ordered list of valid icon-set ids (also used by the modal field). */
 export const VALID_ICON_SETS: readonly IconSet[] = [
@@ -95,6 +96,7 @@ export const ICON_SETS: Record<IconSet, Record<IconKey, string>> = {
     error: "\uf467",     //  nf-oct-x
     scheduled: "\uf43a", //  nf-oct-clock
     agents: "\u{F02A9}", // 󰊩 nf-md-robot
+    throughput: "\uf0e7", //  nf-fa-bolt
   },
   plain: {
     model: "◆",
@@ -107,6 +109,7 @@ export const ICON_SETS: Record<IconSet, Record<IconKey, string>> = {
     error: "✗",
     scheduled: "▷",
     agents: "◉",
+    throughput: "↯",
   },
   ascii: {
     model: "[m]",
@@ -119,6 +122,7 @@ export const ICON_SETS: Record<IconSet, Record<IconKey, string>> = {
     error: "[x]",
     scheduled: "[@]",
     agents: "[a]",
+    throughput: "[/s]",
   },
   minimal: {
     model: "▸",
@@ -131,6 +135,7 @@ export const ICON_SETS: Record<IconSet, Record<IconKey, string>> = {
     error: "✗",
     scheduled: "@",
     agents: "*",
+    throughput: "λ",
   },
   emoji: {
     model: "🤖",
@@ -143,6 +148,7 @@ export const ICON_SETS: Record<IconSet, Record<IconKey, string>> = {
     error: "❌",
     scheduled: "⏰",
     agents: "🤖",
+    throughput: "⚡",
   },
 };
 

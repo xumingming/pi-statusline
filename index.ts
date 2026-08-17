@@ -42,6 +42,13 @@ import { getGitStatus, invalidateGitStatus } from "./git-status.ts";
 import { DEFAULT_ICON_SET, isIconSet, type IconSet } from "./icons.ts";
 import { getKimiUsage, onKimiUsageUpdate } from "./kimi-usage.ts";
 import { cloneDefaultLayout, normaliseLayoutConfig, type LayoutConfig } from "./layout-config.ts";
+import {
+  getThroughput,
+  noteStreamDelta,
+  noteStreamEnd,
+  noteStreamStart,
+  resetThroughput,
+} from "./throughput.ts";
 
 const PROMPT_PADDING = 0;
 
@@ -148,6 +155,7 @@ function renderStatusContent(
     totalOutput: stats.totalOutput,
     totalCacheRead: stats.totalCacheRead,
     totalCacheWrite: stats.totalCacheWrite,
+    throughput: getThroughput(),
     kimiUsage: isKimi ? getKimiUsage() : null,
     iconSet: config.iconSet,
     layout: config.layout,
@@ -225,6 +233,7 @@ export default function (pi: ExtensionAPI) {
   pi.on("session_start", async (_event, ctx) => {
     if (!ctx.hasUI) return;
     config = loadConfig();
+    resetThroughput();
 
     ctx.ui.setWidget(
       "pi-statusline",
@@ -250,6 +259,32 @@ export default function (pi: ExtensionAPI) {
 
   // Token/cost stats change at the end of each turn.
   pi.on("agent_end", async () => {
+    activeTui?.requestRender();
+  });
+
+  // Throughput block: follow the assistant stream lifecycle. The live
+  // estimate is repaint-throttled; the settled value repaints exactly
+  // once at message_end.
+  pi.on("message_start", async (event) => {
+    if (event.message.role === "assistant") noteStreamStart();
+  });
+
+  let lastThroughputPaint = 0;
+  pi.on("message_update", async (event) => {
+    const streamEvent = event.assistantMessageEvent;
+    if (streamEvent && "delta" in streamEvent && typeof streamEvent.delta === "string") {
+      noteStreamDelta(streamEvent.delta.length);
+    }
+    const now = Date.now();
+    if (now - lastThroughputPaint >= 500) {
+      lastThroughputPaint = now;
+      activeTui?.requestRender();
+    }
+  });
+
+  pi.on("message_end", async (event) => {
+    if (event.message.role !== "assistant") return;
+    noteStreamEnd(event.message.usage?.output ?? 0);
     activeTui?.requestRender();
   });
 

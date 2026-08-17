@@ -54,6 +54,7 @@ function makeInputs(overrides: Partial<RenderInputs> = {}): RenderInputs {
     totalOutput: 88000,
     totalCacheRead: 6300000,
     totalCacheWrite: 0,
+    throughput: null,
     kimiUsage: null,
     iconSet: "ascii",
     layout: cloneDefaultLayout(),
@@ -99,6 +100,25 @@ test("composeStatusLine joins all blocks with the separator", () => {
   assert.ok(line.includes("↑639k ↓88k R6.3M"), "token counters");
   assert.ok(!line.includes("W0"), "zero cache-write counter hidden");
   assert.ok(line.includes("<gray>│</>"), "separator is themed dim");
+});
+
+test("throughput block: live estimate marked ~, settled dim, hidden when null", () => {
+  const layout = cloneDefaultLayout();
+
+  const hidden = composeStatusLine(layout, makeInputs({ throughput: null }));
+  assert.ok(!hidden.includes("[/s]"), "no throughput block when idle");
+
+  const live = composeStatusLine(
+    layout,
+    makeInputs({ throughput: { phase: "streaming", tokensPerSec: 47.4 } }),
+  );
+  assert.ok(live.includes("<cyan>[/s] ~47/s"), "live estimate uses cyan + ~ prefix");
+
+  const settled = composeStatusLine(
+    layout,
+    makeInputs({ throughput: { phase: "settled", tokensPerSec: 85.2 } }),
+  );
+  assert.ok(settled.includes("<gray>[/s] 85/s"), "settled value is dim without ~");
 });
 
 test("git block disappears outside a repo, dirty marker uses error color", () => {

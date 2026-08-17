@@ -7,10 +7,10 @@
  *      (see `paletteFromTheme`) instead of hardcoded Tokyo Night Storm
  *      ANSI constants, so the statusline follows `/theme` switches.
  *   2. Trimmed to the core blocks: model, path, git, context, cost,
- *      tokens — plus two Kimi subscription usage bars (kimi-5h,
- *      kimi-weekly) fed by kimi-usage.ts. The notify-chips and stash
- *      blocks (which depended on the events bus / stash feature of
- *      the original) are dropped.
+ *      tokens, throughput — plus two Kimi subscription usage bars
+ *      (kimi-5h, kimi-weekly) fed by kimi-usage.ts. The notify-chips
+ *      and stash blocks (which depended on the events bus / stash
+ *      feature of the original) are dropped.
  *
  * Each `BlockRenderer` is a pure function that turns the shared
  * `RenderInputs` bundle into an ANSI string with **no leading or
@@ -29,6 +29,7 @@ import { basename, dirname } from "node:path";
 import { resolveIcon, type IconSet } from "./icons.ts";
 import type { KimiWindowUsage, KimiUsageSnapshot } from "./kimi-usage.ts";
 import type { LayoutConfig } from "./layout-config.ts";
+import type { ThroughputState } from "./throughput.ts";
 
 // ─────────────────────────────────────────────────────────────────────
 // Palette (derived from the active pi theme)
@@ -183,6 +184,7 @@ export const KNOWN_BLOCK_IDS = [
   "kimi-weekly",
   "cost",
   "tokens",
+  "throughput",
 ] as const;
 
 export type BlockId = (typeof KNOWN_BLOCK_IDS)[number];
@@ -207,6 +209,9 @@ export interface RenderInputs {
   totalOutput: number;
   totalCacheRead: number;
   totalCacheWrite: number;
+  /** Output-token rate for the current/last response; null when idle
+   *  or too early in a stream to estimate. */
+  throughput: ThroughputState | null;
   /** Kimi subscription usage windows; null when the active model is
    *  not served by Kimi or no snapshot has loaded yet. */
   kimiUsage: KimiUsageSnapshot | null;
@@ -351,6 +356,22 @@ const renderTokens: BlockRenderer = (inputs) => {
   return `${p.GRAY}${segments.join(" ")}${p.RESET}`;
 };
 
+/**
+ * `throughput` block — output tokens/sec for the current or last
+ * response. Live estimates (chars-based, while streaming) carry a "~"
+ * prefix and the accent-adjacent cyan; settled values derived from real
+ * usage are dim like the other counters. Empty when idle.
+ */
+const renderThroughput: BlockRenderer = (inputs) => {
+  const t = inputs.throughput;
+  if (!t || t.tokensPerSec <= 0) return "";
+  const p = inputs.palette;
+  const icon = resolveIcon(inputs.iconSet, "throughput");
+  const rate = formatTokens(Math.round(t.tokensPerSec));
+  if (t.phase === "streaming") return `${p.CYAN}${icon} ~${rate}/s${p.RESET}`;
+  return `${p.GRAY}${icon} ${rate}/s${p.RESET}`;
+};
+
 /** Registry consulted by `composeStatusLine`. */
 export const BLOCK_RENDERERS: Record<BlockId, BlockRenderer> = {
   model: renderModel,
@@ -361,6 +382,7 @@ export const BLOCK_RENDERERS: Record<BlockId, BlockRenderer> = {
   "kimi-weekly": renderKimiWeekly,
   cost: renderCost,
   tokens: renderTokens,
+  throughput: renderThroughput,
 };
 
 // ─────────────────────────────────────────────────────────────────────
