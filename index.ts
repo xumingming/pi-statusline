@@ -3,8 +3,8 @@
  *
  * Forked from @wierdbytes/pi-statusline (MIT), trimmed to the rendering
  * core: model/thinking, path, git, context, cost, tokens — plus two
- * Kimi subscription usage bars shown when a Kimi model is active.
- * Colors are
+ * Kimi subscription usage bars and three OpenCode Go usage bars, shown
+ * when the matching provider serves the active model. Colors are
  * derived from the active pi theme at render time (see blocks.ts), so
  * the statusline follows `/theme` switches and custom user themes.
  *
@@ -41,6 +41,7 @@ import {
 import { getGitStatus, invalidateGitStatus } from "./git-status.ts";
 import { DEFAULT_ICON_SET, isIconSet, type IconSet } from "./icons.ts";
 import { getKimiUsage, onKimiUsageUpdate } from "./kimi-usage.ts";
+import { getGoUsage, onGoUsageUpdate } from "./go-usage.ts";
 import { cloneDefaultLayout, normaliseLayoutConfig, type LayoutConfig } from "./layout-config.ts";
 import {
   getThroughput,
@@ -139,6 +140,9 @@ function renderStatusContent(
   const isKimi =
     typeof model?.provider === "string" &&
     model.provider.toLowerCase().includes("kimi");
+  const isOpenCodeGo =
+    typeof model?.provider === "string" &&
+    model.provider.toLowerCase().includes("opencode");
   const inputs: RenderInputs = {
     palette,
     cwd: ctx.cwd,
@@ -157,6 +161,7 @@ function renderStatusContent(
     totalCacheWrite: stats.totalCacheWrite,
     throughput: getThroughput(),
     kimiUsage: isKimi ? getKimiUsage() : null,
+    goUsage: isOpenCodeGo ? getGoUsage() : null,
     iconSet: config.iconSet,
     layout: config.layout,
   };
@@ -227,8 +232,9 @@ export default function (pi: ExtensionAPI) {
   let activeTui: TUI | undefined;
   let config: StatuslineConfig = loadConfig();
 
-  // Repaint when a fresh Kimi usage snapshot lands in the background.
+  // Repaint when a fresh usage snapshot lands in the background.
   onKimiUsageUpdate(() => activeTui?.requestRender());
+  onGoUsageUpdate(() => activeTui?.requestRender());
 
   pi.on("session_start", async (_event, ctx) => {
     if (!ctx.hasUI) return;
@@ -298,7 +304,8 @@ export default function (pi: ExtensionAPI) {
     activeTui?.requestRender();
   });
 
-  // Switching to/from a Kimi model toggles the usage blocks.
+  // Switching to/from a Kimi or OpenCode Go model toggles the usage
+  // blocks.
   pi.on("model_select", async () => {
     activeTui?.requestRender();
   });

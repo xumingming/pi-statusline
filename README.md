@@ -27,6 +27,12 @@ Blocks (left to right, all auto-hide when irrelevant):
   (short rate-limit window and weekly window), shown only when the
   active model is served by Kimi. Polled from the `/usages` API once a
   minute using the `kimi-coding` OAuth token from `~/.pi/agent/auth.json`.
+- **Go 5h / Go weekly / Go monthly** — OpenCode Go plan quota windows
+  (rolling 5h, weekly, monthly), shown only when the active model is
+  served by the `opencode-go` provider. Polled from the `/usage` API
+  once a minute using the `opencode-go` API key from
+  `~/.pi/agent/auth.json`; the weekly block also shows when the window
+  ends.
 - **Cost** — session total in USD when greater than zero.
 - **Tokens** — cumulative `↑input ↓output R{cacheRead} W{cacheWrite}`.
 - **Throughput** — output tokens/sec. While a response streams this is

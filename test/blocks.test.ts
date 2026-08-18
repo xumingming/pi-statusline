@@ -56,6 +56,7 @@ function makeInputs(overrides: Partial<RenderInputs> = {}): RenderInputs {
     totalCacheWrite: 0,
     throughput: null,
     kimiUsage: null,
+    goUsage: null,
     iconSet: "ascii",
     layout: cloneDefaultLayout(),
     ...overrides,
@@ -255,6 +256,76 @@ test("kimi usage blocks can be disabled via layout", () => {
   const line = composeStatusLine(layout, makeInputs({ kimiUsage: usage, layout }));
   assert.ok(!line.includes("43%"), "5h block disabled");
   assert.ok(!line.includes("9%"), "weekly block disabled");
+});
+
+test("go usage bars appear only with an opencode-go snapshot and only when enabled", () => {
+  const layout = cloneDefaultLayout();
+  const hidden = composeStatusLine(layout, makeInputs());
+  assert.ok(!hidden.includes("5h"), "no 5h block without usage data");
+  assert.ok(!hidden.includes("wk"), "no weekly block without usage data");
+
+  const usage = {
+    rolling: { label: "5h", percent: 1 },
+    weekly: { label: "wk", percent: 0 },
+    monthly: { label: "mo", percent: 0 },
+  };
+  const line = composeStatusLine(layout, makeInputs({ goUsage: usage }));
+  assert.ok(line.includes("<gray>5h</> <success>1%</>"), "5h block with low fill");
+  assert.ok(line.includes("<gray>wk</> <success>0%</>"), "weekly block with low fill");
+  assert.ok(line.includes("<gray>mo</> <success>0%</>"), "monthly block rendered");
+  assert.ok(line.includes("\u2593"), "progress bar rendered");
+});
+
+test("go usage bars shift success -> warning -> error with fill level", () => {
+  const layout = cloneDefaultLayout();
+  const at = (percent: number) =>
+    composeStatusLine(
+      layout,
+      makeInputs({ goUsage: { rolling: { label: "5h", percent }, weekly: null, monthly: null } }),
+    );
+
+  assert.ok(at(50).includes("<success>50%"), "low fill is success-colored");
+  assert.ok(at(70).includes("<warning>70%"), "mid fill is warning-colored");
+  assert.ok(at(90).includes("<error>90%"), "high fill is error-colored");
+});
+
+test("go weekly block shows when the window ends", () => {
+  const layout = cloneDefaultLayout();
+  const resetsAt = "2026-08-24T00:00:00.520Z";
+  const d = new Date(resetsAt);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const expected =
+    `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ` +
+    `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+
+  const usage = {
+    rolling: null,
+    weekly: { label: "wk", percent: 3, resetsAt },
+    monthly: null,
+  };
+  const line = composeStatusLine(layout, makeInputs({ goUsage: usage }));
+  assert.ok(
+    line.includes(`<gray>ends ${expected}</>`),
+    "weekly block shows local reset time",
+  );
+});
+
+test("go usage blocks can be disabled via layout", () => {
+  const layout = normaliseLayoutConfig({
+    enabled: { "go-5h": false, "go-weekly": false, "go-monthly": false } as Record<
+      BlockId,
+      boolean
+    >,
+  });
+  const usage = {
+    rolling: { label: "5h", percent: 37 },
+    weekly: { label: "wk", percent: 24 },
+    monthly: { label: "mo", percent: 9 },
+  };
+  const line = composeStatusLine(layout, makeInputs({ goUsage: usage, layout }));
+  assert.ok(!line.includes("37%"), "5h block disabled");
+  assert.ok(!line.includes("24%"), "weekly block disabled");
+  assert.ok(!line.includes("9%"), "monthly block disabled");
 });
 
 test("format helpers", () => {

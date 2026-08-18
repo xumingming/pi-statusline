@@ -7,8 +7,10 @@
  *      (see `paletteFromTheme`) instead of hardcoded Tokyo Night Storm
  *      ANSI constants, so the statusline follows `/theme` switches.
  *   2. Trimmed to the core blocks: model, path, git, context, cost,
- *      tokens, throughput — plus two Kimi subscription usage bars
- *      (kimi-5h, kimi-weekly) fed by kimi-usage.ts. The notify-chips
+ *      tokens, throughput — plus Kimi subscription usage bars
+ *      (kimi-5h, kimi-weekly) fed by kimi-usage.ts and OpenCode Go
+ *      usage bars (go-5h, go-weekly, go-monthly) fed by go-usage.ts.
+ *      The notify-chips
  *      and stash blocks (which depended on the events bus / stash
  *      feature of the original) are dropped.
  *
@@ -28,6 +30,7 @@ import { basename, dirname } from "node:path";
 
 import { resolveIcon, type IconSet } from "./icons.ts";
 import type { KimiWindowUsage, KimiUsageSnapshot } from "./kimi-usage.ts";
+import type { GoUsageSnapshot, GoWindowUsage } from "./go-usage.ts";
 import type { LayoutConfig } from "./layout-config.ts";
 import type { ThroughputState } from "./throughput.ts";
 
@@ -182,6 +185,9 @@ export const KNOWN_BLOCK_IDS = [
   "context",
   "kimi-5h",
   "kimi-weekly",
+  "go-5h",
+  "go-weekly",
+  "go-monthly",
   "cost",
   "tokens",
   "throughput",
@@ -215,6 +221,9 @@ export interface RenderInputs {
   /** Kimi subscription usage windows; null when the active model is
    *  not served by Kimi or no snapshot has loaded yet. */
   kimiUsage: KimiUsageSnapshot | null;
+  /** OpenCode Go subscription usage windows; null when the active
+   *  model is not served by OpenCode Go or no snapshot has loaded. */
+  goUsage: GoUsageSnapshot | null;
   iconSet: IconSet;
   layout: LayoutConfig;
 }
@@ -331,6 +340,48 @@ const renderKimiWeekly: BlockRenderer = (inputs) => {
   return `${base} ${p.GRAY}ends ${reset}${p.RESET}`;
 };
 
+/**
+ * Shared renderer for the OpenCode Go usage-window blocks: a dim
+ * label, the fill percent colored by level, and a progress bar. The
+ * Go API exposes the fill directly (`percent`), unlike Kimi's
+ * used/limit pair, so the bar is driven by that percentage.
+ */
+function renderGoWindow(row: GoWindowUsage, palette: Palette): string {
+  const p = palette;
+  const pct = Math.min(100, Math.max(0, row.percent));
+  const color = pctColorFor(pct, p);
+  const bar = buildBar(pct, color, p);
+  return (
+    `${p.GRAY}${row.label}${p.RESET} ${color}${pct}%${p.RESET} ` +
+    `${p.GRAY}[${p.RESET}${bar}${p.GRAY}]${p.RESET}`
+  );
+}
+
+/** `go-5h` block — OpenCode Go rolling 5-hour window. */
+const renderGoFiveHour: BlockRenderer = (inputs) => {
+  const row = inputs.goUsage?.rolling;
+  if (!row) return "";
+  return renderGoWindow(row, inputs.palette);
+};
+
+/** `go-weekly` block — OpenCode Go weekly window plus its end time. */
+const renderGoWeekly: BlockRenderer = (inputs) => {
+  const row = inputs.goUsage?.weekly;
+  if (!row) return "";
+  const p = inputs.palette;
+  const base = renderGoWindow(row, p);
+  const reset = formatResetTime(row.resetsAt);
+  if (!reset) return base;
+  return `${base} ${p.GRAY}ends ${reset}${p.RESET}`;
+};
+
+/** `go-monthly` block — OpenCode Go monthly window. */
+const renderGoMonthly: BlockRenderer = (inputs) => {
+  const row = inputs.goUsage?.monthly;
+  if (!row) return "";
+  return renderGoWindow(row, inputs.palette);
+};
+
 /** `cost` block — session total in USD; empty when zero. */
 const renderCost: BlockRenderer = (inputs) => {
   const p = inputs.palette;
@@ -380,6 +431,9 @@ export const BLOCK_RENDERERS: Record<BlockId, BlockRenderer> = {
   context: renderContext,
   "kimi-5h": renderKimiFiveHour,
   "kimi-weekly": renderKimiWeekly,
+  "go-5h": renderGoFiveHour,
+  "go-weekly": renderGoWeekly,
+  "go-monthly": renderGoMonthly,
   cost: renderCost,
   tokens: renderTokens,
   throughput: renderThroughput,

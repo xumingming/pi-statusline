@@ -17,6 +17,8 @@ active pi theme at render time.
 - `git-status.ts` — git branch/dirty with TTL cache.
 - `kimi-usage.ts` — Kimi Coding `/usages` quota windows (5h + weekly)
   with TTL cache.
+- `go-usage.ts` — OpenCode Go `/usage` quota windows (rolling 5h +
+  weekly + monthly) with TTL cache.
 - `test/` — `node:test` unit tests.
 
 ## Definition of Done
