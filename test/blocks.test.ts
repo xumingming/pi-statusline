@@ -121,11 +121,17 @@ test("default order places cost, tokens, throughput right after git", () => {
   assert.ok(pos("[/s] 85/s") < pos("12%"), "context after throughput");
 });
 
-test("throughput block: live estimate marked ~, settled dim, hidden when null", () => {
+test("throughput block: live estimate marked ~, settled dim, 0/s shown when no rate", () => {
   const layout = cloneDefaultLayout();
 
-  const hidden = composeStatusLine(layout, makeInputs({ throughput: null }));
-  assert.ok(!hidden.includes("[/s]"), "no throughput block when idle");
+  const noState = composeStatusLine(layout, makeInputs({ throughput: null }));
+  assert.ok(!noState.includes("[/s]"), "no block when the state is null");
+
+  const zero = composeStatusLine(
+    layout,
+    makeInputs({ throughput: { phase: "settled", tokensPerSec: 0 } }),
+  );
+  assert.ok(zero.includes("<gray>[/s] 0/s</>"), "no measurable rate renders dim 0/s");
 
   const live = composeStatusLine(
     layout,

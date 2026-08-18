@@ -415,11 +415,13 @@ const renderTokens: BlockRenderer = (inputs) => {
  * `throughput` block — output tokens/sec for the current or last
  * response. Live estimates (chars-based, while streaming) carry a "~"
  * prefix and the accent-adjacent cyan; settled values derived from real
- * usage are dim like the other counters. Empty when idle.
+ * usage are dim like the other counters. Reports 0/s when there is no
+ * measurable rate (idle, silent thinking, or a pure tool-call turn)
+ * rather than disappearing, so the slot is always filled.
  */
 const renderThroughput: BlockRenderer = (inputs) => {
   const t = inputs.throughput;
-  if (!t || t.tokensPerSec <= 0) return "";
+  if (!t) return "";
   const p = inputs.palette;
   const icon = resolveIcon(inputs.iconSet, "throughput");
   const rate = formatTokens(Math.round(t.tokensPerSec));

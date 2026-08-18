@@ -23,7 +23,7 @@
 const CHARS_PER_TOKEN = 4;
 /** Minimum stream age before a live estimate is shown, so the first
  *  few deltas do not produce wild spikes. */
-const MIN_STREAM_AGE_MS = 1000;
+const MIN_STREAM_AGE_MS = 300;
 /** Minimum stream duration for a settled rate to count; instant
  *  cache-hit / aborted responses carry no meaningful rate. */
 const MIN_SETTLED_MS = 500;
@@ -38,11 +38,12 @@ let startedAt = 0;
 let streamedChars = 0;
 let settled: ThroughputState | null = null;
 
-/** Open a streaming window. Called on assistant `message_start`. */
+/** Open a streaming window. Called on assistant `message_start`.
+ *  Does not clear the last settled rate: it stays as a fallback for
+ *  responses that end with no measurable result. */
 export function noteStreamStart(now: number = Date.now()): void {
   startedAt = now;
   streamedChars = 0;
-  settled = null;
 }
 
 /** Accumulate streamed text. Called with stream delta lengths. */
@@ -58,10 +59,14 @@ export function noteStreamDelta(chars: number): void {
 export function noteStreamEnd(outputTokens: number, now: number = Date.now()): void {
   if (startedAt === 0) return;
   const elapsedMs = now - startedAt;
-  settled =
+  const rate =
     elapsedMs >= MIN_SETTLED_MS && outputTokens > 0
-      ? { phase: "settled", tokensPerSec: outputTokens / (elapsedMs / 1000) }
+      ? outputTokens / (elapsedMs / 1000)
       : null;
+  // An unusable result (zero tokens, or a stream too short to measure)
+  // keeps the previous settled rate so the block does not go blank
+  // after errored / silent responses.
+  if (rate !== null) settled = { phase: "settled", tokensPerSec: rate };
   startedAt = 0;
   streamedChars = 0;
 }
@@ -74,18 +79,24 @@ export function resetThroughput(): void {
 }
 
 /**
- * Current throughput for the statusline; null when there is nothing
- * meaningful to show (idle before the first response, a stream younger
- * than MIN_STREAM_AGE_MS, or a response with no countable output).
+ * Current throughput for the statusline. Never returns "nothing":
+ * when no stream is running and no settled rate exists yet (idle at
+ * startup), or a stream is too young / has streamed no characters
+ * (silent thinking, pure tool-call turns), it reports a 0/s rate so
+ * the block always has a value to show.
  */
-export function getThroughput(now: number = Date.now()): ThroughputState | null {
+export function getThroughput(now: number = Date.now()): ThroughputState {
   if (startedAt !== 0) {
     const ageMs = now - startedAt;
-    if (ageMs < MIN_STREAM_AGE_MS || streamedChars <= 0) return null;
-    return {
-      phase: "streaming",
-      tokensPerSec: streamedChars / CHARS_PER_TOKEN / (ageMs / 1000),
-    };
+    if (ageMs >= MIN_STREAM_AGE_MS && streamedChars > 0) {
+      return {
+        phase: "streaming",
+        tokensPerSec: streamedChars / CHARS_PER_TOKEN / (ageMs / 1000),
+      };
+    }
+    // A stream is open but not measurable yet: young stream, or a long
+    // thinking phase with nothing streamed. Report 0/s rather than blank.
+    return { phase: "settled", tokensPerSec: 0 };
   }
-  return settled;
+  return settled ?? { phase: "settled", tokensPerSec: 0 };
 }

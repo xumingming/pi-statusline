@@ -27,8 +27,11 @@ Blocks (left to right, all auto-hide when irrelevant):
 - **Throughput** — output tokens/sec. While a response streams this is
   a live estimate from streamed text length (marked `~`, cyan) since
   providers only report usage at the end; once the response finishes
-  the real `usage.output` over the streaming time is shown (dim) until
-  the next response starts.
+  the real `usage.output` over the streaming time is shown (dim) between
+  responses, kept as a fallback when a later response ends with no
+  measurable output. Reports dim `0/s` when nothing is measurable yet
+  (idle, silent thinking, or pure tool-call turns), so the slot is
+  always filled.
 - **Context** — percentage of the usable context window before
   autocompaction (33k buffer reserved), with a progress bar that shifts
   success → warning → error as it fills.
