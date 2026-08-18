@@ -113,11 +113,12 @@ const STANDARD_THINKING_LEVELS = new Set(["off", "minimal", "low", "medium", "hi
 // Generic format helpers
 // ─────────────────────────────────────────────────────────────────────
 
-export function shortenPath(cwd: string): string {
-  const segments = cwd.split("/");
-  if (segments.length <= 3) return cwd;
-  const n = segments.length;
-  return `…/${segments[n - 3]}/${segments[n - 2]}/${segments[n - 1]}`;
+export function shortenPath(cwd: string, segments = 1): string {
+  const take = Math.min(3, Math.max(1, Math.floor(segments)));
+  const parts = cwd.split("/");
+  if (parts.length <= take) return cwd;
+  const tail = parts.slice(-take);
+  return take === 1 ? tail[0] : `…/${tail.join("/")}`;
 }
 
 export function formatTokens(n: number): string {
@@ -182,15 +183,15 @@ export const KNOWN_BLOCK_IDS = [
   "model",
   "path",
   "git",
+  "cost",
+  "tokens",
+  "throughput",
   "context",
   "kimi-5h",
   "kimi-weekly",
   "go-5h",
   "go-weekly",
   "go-monthly",
-  "cost",
-  "tokens",
-  "throughput",
 ] as const;
 
 export type BlockId = (typeof KNOWN_BLOCK_IDS)[number];
@@ -251,12 +252,15 @@ const renderModel: BlockRenderer = (inputs) => {
   return `${head} ${color}${icon} ${label}${p.RESET}`;
 };
 
-/** `path` block — `…/parent/dir` with the current directory accented. */
+/** `path` block — `…/parent/dir` with the current directory accented;
+ *  with `layout.path.segments = 1` only the directory name is shown. */
 const renderPath: BlockRenderer = (inputs) => {
   const p = inputs.palette;
-  const shortDir = shortenPath(inputs.cwd);
+  const segments = inputs.layout.path.segments;
+  const shortDir = shortenPath(inputs.cwd, segments);
   const dirParent = dirname(shortDir);
   const dirName = basename(shortDir) || shortDir;
+  if (segments <= 1) return `${p.PURPLE}${dirName}${p.RESET}`;
   return `${p.GRAY}${dirParent}${p.RESET}${p.PURPLE}/${dirName}${p.RESET}`;
 };
 

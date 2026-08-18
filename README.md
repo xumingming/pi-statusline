@@ -10,7 +10,7 @@ Renders a compact one-line status row above the editor, with the editor's
 top/bottom borders stripped so the two visually merge:
 
 ```
-─ 🤖 Kimi K3 🧠 high │ …/abei/Code/spark │ master ✓ │ 12%: 127k[▓░░░░░░░░░]893k │ 5h 43%[▓▓▓▓░░░░░░] │ wk 9%[▓░░░░░░░░░] │ $2.02 │ ↑639k ↓88k R6.3M
+─ 🤖 Kimi K3 🧠 high │ spark │ master ✓ │ $2.02 │ ↑639k ↓88k R6.3M │ 12%: 127k[▓░░░░░░░░░]893k │ 5h 43%[▓▓▓▓░░░░░░] │ wk 9%[▓░░░░░░░░░]
 ```
 
 Blocks (left to right, all auto-hide when irrelevant):
@@ -18,8 +18,17 @@ Blocks (left to right, all auto-hide when irrelevant):
 - **Model** — icon + display name, with an inline thinking-level segment
   for reasoning-capable models. Thinking colors use the theme's
   `thinkingOff`…`thinkingMax` tokens.
-- **Path** — last three segments of `cwd`, current directory accented.
+- **Path** — trailing segments of `cwd` (directory name only by
+  default), current directory accented. `layout.path.segments` controls
+  how many segments are shown (1 = directory name only).
 - **Git** — branch + clean/dirty marker (`✓` success / `✗` error).
+- **Cost** — session total in USD when greater than zero.
+- **Tokens** — cumulative `↑input ↓output R{cacheRead} W{cacheWrite}`.
+- **Throughput** — output tokens/sec. While a response streams this is
+  a live estimate from streamed text length (marked `~`, cyan) since
+  providers only report usage at the end; once the response finishes
+  the real `usage.output` over the streaming time is shown (dim) until
+  the next response starts.
 - **Context** — percentage of the usable context window before
   autocompaction (33k buffer reserved), with a progress bar that shifts
   success → warning → error as it fills.
@@ -33,13 +42,6 @@ Blocks (left to right, all auto-hide when irrelevant):
   once a minute using the `opencode-go` API key from
   `~/.pi/agent/auth.json`; the weekly block also shows when the window
   ends.
-- **Cost** — session total in USD when greater than zero.
-- **Tokens** — cumulative `↑input ↓output R{cacheRead} W{cacheWrite}`.
-- **Throughput** — output tokens/sec. While a response streams this is
-  a live estimate from streamed text length (marked `~`, cyan) since
-  providers only report usage at the end; once the response finishes
-  the real `usage.output` over the streaming time is shown (dim) until
-  the next response starts.
 
 ## What changed vs. the original
 
@@ -96,6 +98,10 @@ restart pi after edits):
 `iconSet`: `nerd-font` (default), `plain`, `ascii`, `minimal`, `emoji`.
 Missing/invalid fields fall back to defaults; unknown block ids are dropped
 and missing ones appended.
+
+`layout.path.segments`: number of trailing path segments shown by the
+path block, 1-3 (default 1: directory name only). Set `3` to show
+`…/parent/dir` again.
 
 ## Development
 

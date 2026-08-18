@@ -42,6 +42,13 @@ export interface TokensSubToggles {
   cacheWrite: boolean;
 }
 
+/** Options for the `path` block. */
+export interface PathOptions {
+  /** Number of trailing path segments to render; 1 = directory name
+   *  only. Clamped to 1-3. Default: 1. */
+  segments: number;
+}
+
 /** Persisted layout slice. */
 export interface LayoutConfig {
   /** Ordered list of block ids. Drives `composeStatusLine`. */
@@ -50,6 +57,8 @@ export interface LayoutConfig {
   enabled: Record<BlockId, boolean>;
   /** Model sub-toggles (thinking segment). */
   model: ModelSubToggles;
+  /** Path block options (segment count). */
+  path: PathOptions;
   /** Token-counter sub-toggles. */
   tokens: TokensSubToggles;
   /** Separator glyph rendered between visible blocks. */
@@ -77,6 +86,7 @@ export const DEFAULT_LAYOUT_CONFIG: LayoutConfig = Object.freeze({
     throughput: true,
   }) as Record<BlockId, boolean>,
   model: Object.freeze({ showThinking: true }) as ModelSubToggles,
+  path: Object.freeze({ segments: 1 }) as PathOptions,
   tokens: Object.freeze({
     input: true,
     output: true,
@@ -92,6 +102,7 @@ export function cloneDefaultLayout(): LayoutConfig {
     order: [...DEFAULT_LAYOUT_CONFIG.order],
     enabled: { ...DEFAULT_LAYOUT_CONFIG.enabled },
     model: { ...DEFAULT_LAYOUT_CONFIG.model },
+    path: { ...DEFAULT_LAYOUT_CONFIG.path },
     tokens: { ...DEFAULT_LAYOUT_CONFIG.tokens },
     separator: DEFAULT_LAYOUT_CONFIG.separator,
   };
@@ -105,7 +116,8 @@ export function cloneDefaultLayout(): LayoutConfig {
  *     appended to the tail in `KNOWN_BLOCK_IDS` order.
  *   - `enabled` keys missing for known ids default to `true`; extra
  *     keys are dropped.
- *   - `model` / `tokens` sub-toggles default to `true` per key.
+ *   - `model` / `tokens` sub-toggles default to `true` per key;
+ *     `path.segments` is clamped to 1-3.
  *   - `separator` is validated/clamped.
  */
 export function normaliseLayoutConfig(raw: Partial<LayoutConfig> | undefined): LayoutConfig {
@@ -155,10 +167,27 @@ export function normaliseLayoutConfig(raw: Partial<LayoutConfig> | undefined): L
     if (typeof src.cacheWrite === "boolean") merged.tokens.cacheWrite = src.cacheWrite;
   }
 
+  // ── path options ──────────────────────────────────────────────────
+  if (raw.path && typeof raw.path === "object") {
+    const src = raw.path as unknown as Record<string, unknown>;
+    if (typeof src.segments === "number") {
+      merged.path.segments = clampPathSegments(src.segments);
+    }
+  }
+
   // ── separator ───────────────────────────────────────────────────────
   merged.separator = clampSeparator(raw.separator);
 
   return merged;
+}
+
+/**
+ * Clamp the path segment count to the supported 1-3 range.
+ * Non-finite values fall back to the default.
+ */
+export function clampPathSegments(value: number): number {
+  if (!Number.isFinite(value)) return DEFAULT_LAYOUT_CONFIG.path.segments;
+  return Math.min(3, Math.max(1, Math.floor(value)));
 }
 
 /**

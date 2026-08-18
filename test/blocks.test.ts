@@ -94,13 +94,31 @@ test("composeStatusLine joins all blocks with the separator", () => {
 
   assert.ok(line.includes("[m] Kimi K3"), "model block");
   assert.ok(line.includes("<thinkHigh>"), "thinking level uses theme thinking color");
-  assert.ok(line.includes("…/abei/Code</><purple>/spark"), "path block");
+  assert.ok(line.includes("<purple>spark</>"), "path block");
   assert.ok(line.includes("<cyan>master <success>✓"), "clean git block");
   assert.ok(line.includes("12%"), "context percentage");
   assert.ok(line.includes("$2.02"), "cost block");
   assert.ok(line.includes("↑639k ↓88k R6.3M"), "token counters");
   assert.ok(!line.includes("W0"), "zero cache-write counter hidden");
   assert.ok(line.includes("<gray>│</>"), "separator is themed dim");
+});
+
+test("default order places cost, tokens, throughput right after git", () => {
+  const layout = cloneDefaultLayout();
+  const line = composeStatusLine(
+    layout,
+    makeInputs({ layout, throughput: { phase: "settled", tokensPerSec: 85.2 } }),
+  );
+  const pos = (needle: string) => line.indexOf(needle);
+  assert.ok(pos("master") !== -1, "git renders");
+  assert.ok(pos("$2.02") !== -1, "cost renders");
+  assert.ok(pos("↑639k") !== -1, "tokens render");
+  assert.ok(pos("[/s] 85/s") !== -1, "throughput renders");
+  assert.ok(pos("12%") !== -1, "context renders");
+  assert.ok(pos("master") < pos("$2.02"), "cost right after git");
+  assert.ok(pos("$2.02") < pos("↑639k"), "tokens after cost");
+  assert.ok(pos("↑639k") < pos("[/s] 85/s"), "throughput after tokens");
+  assert.ok(pos("[/s] 85/s") < pos("12%"), "context after throughput");
 });
 
 test("throughput block: live estimate marked ~, settled dim, hidden when null", () => {
@@ -328,13 +346,52 @@ test("go usage blocks can be disabled via layout", () => {
   assert.ok(!line.includes("9%"), "monthly block disabled");
 });
 
+test("path block renders only the directory name by default", () => {
+  const layout = cloneDefaultLayout();
+  const line = composeStatusLine(layout, makeInputs({ layout }));
+  assert.ok(line.includes("<purple>spark</>"), "basename rendered in purple");
+  assert.ok(!line.includes("…/abei"), "no ancestor segments shown");
+});
+
+test("path block shows parent segments with path.segments = 3", () => {
+  const layout = normaliseLayoutConfig({ path: { segments: 3 } });
+  const line = composeStatusLine(layout, makeInputs({ layout }));
+  assert.ok(
+    line.includes("…/abei/Code</><purple>/spark"),
+    "parent segments in gray, basename purple",
+  );
+});
+
+test("path.segments is clamped to 1..3 and defaults to 1", () => {
+  const defaults = normaliseLayoutConfig(undefined);
+  assert.equal(defaults.path.segments, 1, "default is 1");
+
+  const outOfRange = normaliseLayoutConfig({ path: { segments: 9 } });
+  assert.equal(outOfRange.path.segments, 3, "clamped down to 3");
+
+  const zero = normaliseLayoutConfig({ path: { segments: 0 } });
+  assert.equal(zero.path.segments, 1, "zero clamped up to 1");
+
+  const negative = normaliseLayoutConfig({ path: { segments: -2 } });
+  assert.equal(negative.path.segments, 1, "negative clamped up to 1");
+
+  const nonNumber = normaliseLayoutConfig({
+    path: { segments: "short" } as unknown as { segments: number },
+  });
+  assert.equal(nonNumber.path.segments, 1, "non-number falls back to default");
+});
+
 test("format helpers", () => {
   assert.equal(formatTokens(999), "999");
   assert.equal(formatTokens(1500), "1.5k");
   assert.equal(formatTokens(639000), "639k");
   assert.equal(formatTokens(6300000), "6.3M");
-  assert.equal(shortenPath("/Users/abei/Code/spark"), "…/abei/Code/spark");
-  assert.equal(shortenPath("/tmp/x"), "/tmp/x");
+  assert.equal(shortenPath("/Users/abei/Code/spark"), "spark");
+  assert.equal(shortenPath("/tmp/x"), "x");
+  assert.equal(shortenPath("/tmp/x", 3), "/tmp/x");
+  assert.equal(shortenPath("/Users/abei/Code/spark", 1), "spark");
+  assert.equal(shortenPath("/Users/abei/Code/spark", 2), "…/Code/spark");
+  assert.equal(shortenPath("/Users/abei/Code/spark", 3), "…/abei/Code/spark");
   assert.equal(shortenModelName({ name: "Claude Opus 4.7" }), "Opus 4.7");
   assert.equal(shortenModelName({ id: "anthropic/claude-opus" }), "claude-opus");
 });
