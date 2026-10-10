@@ -57,6 +57,7 @@ function makeInputs(overrides: Partial<RenderInputs> = {}): RenderInputs {
     throughput: null,
     kimiUsage: null,
     goUsage: null,
+    cursorUsage: null,
     iconSet: "ascii",
     layout: cloneDefaultLayout(),
     ...overrides,
@@ -385,6 +386,27 @@ test("path.segments is clamped to 1..3 and defaults to 1", () => {
     path: { segments: "short" } as unknown as { segments: number },
   });
   assert.equal(nonNumber.path.segments, 1, "non-number falls back to default");
+});
+
+test("go and cursor usage bars round fractional percents to integers", () => {
+  const layout = cloneDefaultLayout();
+  const frac = 1.3629629629629632;
+  const goLine = composeStatusLine(
+    layout,
+    makeInputs({
+      goUsage: { rolling: { label: "5h", percent: frac }, weekly: null, monthly: null },
+    }),
+  );
+  assert.ok(goLine.includes("<success>1%"), "go bar shows rounded percent");
+
+  const cursorLine = composeStatusLine(
+    layout,
+    makeInputs({
+      cursorUsage: { total: { label: "cur", percent: frac }, auto: null, api: null },
+    }),
+  );
+  assert.ok(cursorLine.includes("<success>1%"), "cursor bar shows rounded percent");
+  assert.ok(!cursorLine.includes("1.362"), "fractional digits not shown in percent");
 });
 
 test("format helpers", () => {

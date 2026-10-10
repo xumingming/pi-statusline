@@ -31,6 +31,7 @@ import { basename, dirname } from "node:path";
 import { resolveIcon, type IconSet } from "./icons.ts";
 import type { KimiWindowUsage, KimiUsageSnapshot } from "./kimi-usage.ts";
 import type { GoUsageSnapshot, GoWindowUsage } from "./go-usage.ts";
+import type { CursorUsageSnapshot, CursorWindowUsage } from "./cursor-usage.ts";
 import type { LayoutConfig } from "./layout-config.ts";
 import type { ThroughputState } from "./throughput.ts";
 
@@ -192,6 +193,9 @@ export const KNOWN_BLOCK_IDS = [
   "go-5h",
   "go-weekly",
   "go-monthly",
+  "cursor-total",
+  "cursor-auto",
+  "cursor-api",
 ] as const;
 
 export type BlockId = (typeof KNOWN_BLOCK_IDS)[number];
@@ -225,6 +229,9 @@ export interface RenderInputs {
   /** OpenCode Go subscription usage windows; null when the active
    *  model is not served by OpenCode Go or no snapshot has loaded. */
   goUsage: GoUsageSnapshot | null;
+  /** Cursor subscription usage meters; null when the active model
+   *  is not served by the Cursor bridge or no snapshot has loaded. */
+  cursorUsage: CursorUsageSnapshot | null;
   iconSet: IconSet;
   layout: LayoutConfig;
 }
@@ -352,7 +359,7 @@ const renderKimiWeekly: BlockRenderer = (inputs) => {
  */
 function renderGoWindow(row: GoWindowUsage, palette: Palette): string {
   const p = palette;
-  const pct = Math.min(100, Math.max(0, row.percent));
+  const pct = Math.min(100, Math.max(0, Math.round(row.percent)));
   const color = pctColorFor(pct, p);
   const bar = buildBar(pct, color, p);
   return (
@@ -384,6 +391,39 @@ const renderGoMonthly: BlockRenderer = (inputs) => {
   const row = inputs.goUsage?.monthly;
   if (!row) return "";
   return renderGoWindow(row, inputs.palette);
+};
+
+/**
+ * Shared renderer for the Cursor subscription blocks, reusing the
+ * Go window's percent-driven shape.
+ */
+function renderCursorWindow(row: CursorWindowUsage, palette: Palette): string {
+  return renderGoWindow(row, palette);
+}
+
+/** `cursor-total` block — Cursor billing-cycle usage plus its end time. */
+const renderCursorTotal: BlockRenderer = (inputs) => {
+  const row = inputs.cursorUsage?.total;
+  if (!row) return "";
+  const p = inputs.palette;
+  const base = renderCursorWindow(row, p);
+  const reset = formatResetTime(row.resetsAt);
+  if (!reset) return base;
+  return `${base} ${p.GRAY}ends ${reset}${p.RESET}`;
+};
+
+/** `cursor-auto` block — Cursor Auto + Composer model pool. */
+const renderCursorAuto: BlockRenderer = (inputs) => {
+  const row = inputs.cursorUsage?.auto;
+  if (!row) return "";
+  return renderCursorWindow(row, inputs.palette);
+};
+
+/** `cursor-api` block — Cursor API model pool. */
+const renderCursorApi: BlockRenderer = (inputs) => {
+  const row = inputs.cursorUsage?.api;
+  if (!row) return "";
+  return renderCursorWindow(row, inputs.palette);
 };
 
 /** `cost` block — session total in USD; empty when zero. */
@@ -440,6 +480,9 @@ export const BLOCK_RENDERERS: Record<BlockId, BlockRenderer> = {
   "go-5h": renderGoFiveHour,
   "go-weekly": renderGoWeekly,
   "go-monthly": renderGoMonthly,
+  "cursor-total": renderCursorTotal,
+  "cursor-auto": renderCursorAuto,
+  "cursor-api": renderCursorApi,
   cost: renderCost,
   tokens: renderTokens,
   throughput: renderThroughput,

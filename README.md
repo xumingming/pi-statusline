@@ -45,6 +45,15 @@ Blocks (left to right, all auto-hide when irrelevant):
   once a minute using the `opencode-go` API key from
   `~/.pi/agent/auth.json`; the weekly block also shows when the window
   ends.
+- **Cursor total / Cursor auto / Cursor api** — Cursor subscription
+  usage meters (billing cycle total, Auto + Composer pool, API pool),
+  shown only when the active model is served by the `cursor-opencode`
+  bridge provider. Polled once a minute from Cursor's dashboard API
+  (`GetCurrentPeriodUsage`, `/api/usage/summary` fallback) using the
+  Cursor OAuth/API credential pi stores in `~/.pi/agent/auth.json`;
+  the total block also shows when the billing cycle ends. These are
+  unofficial endpoints — plans without metered data or upstream API
+  changes may leave the blocks hidden.
 
 ## What changed vs. the original
 

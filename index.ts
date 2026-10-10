@@ -42,6 +42,7 @@ import { getGitStatus, invalidateGitStatus } from "./git-status.ts";
 import { DEFAULT_ICON_SET, isIconSet, type IconSet } from "./icons.ts";
 import { getKimiUsage, onKimiUsageUpdate } from "./kimi-usage.ts";
 import { getGoUsage, onGoUsageUpdate } from "./go-usage.ts";
+import { getCursorUsage, onCursorUsageUpdate } from "./cursor-usage.ts";
 import { cloneDefaultLayout, normaliseLayoutConfig, type LayoutConfig } from "./layout-config.ts";
 import {
   getThroughput,
@@ -137,12 +138,15 @@ function renderStatusContent(
   const git = getGitStatus(ctx.cwd);
 
   const model = ctx.model as Model<any> | undefined;
-  const isKimi =
-    typeof model?.provider === "string" &&
-    model.provider.toLowerCase().includes("kimi");
-  const isOpenCodeGo =
-    typeof model?.provider === "string" &&
-    model.provider.toLowerCase().includes("opencode");
+  const providerName =
+    typeof model?.provider === "string" ? model.provider.toLowerCase() : "";
+  const isKimi = providerName.includes("kimi");
+  const isCursorBridge =
+    providerName.includes("cursor-opencode") || providerName === "cursor";
+  // The Cursor bridge registers as "cursor-opencode", which also
+  // contains the substring caught above — exclude it so OpenCode Go
+  // bars don't render for Cursor models.
+  const isOpenCodeGo = providerName.includes("opencode") && !isCursorBridge;
   const inputs: RenderInputs = {
     palette,
     cwd: ctx.cwd,
@@ -162,6 +166,7 @@ function renderStatusContent(
     throughput: getThroughput(),
     kimiUsage: isKimi ? getKimiUsage() : null,
     goUsage: isOpenCodeGo ? getGoUsage() : null,
+    cursorUsage: isCursorBridge ? getCursorUsage() : null,
     iconSet: config.iconSet,
     layout: config.layout,
   };
@@ -235,6 +240,7 @@ export default function (pi: ExtensionAPI) {
   // Repaint when a fresh usage snapshot lands in the background.
   onKimiUsageUpdate(() => activeTui?.requestRender());
   onGoUsageUpdate(() => activeTui?.requestRender());
+  onCursorUsageUpdate(() => activeTui?.requestRender());
 
   pi.on("session_start", async (_event, ctx) => {
     if (!ctx.hasUI) return;
