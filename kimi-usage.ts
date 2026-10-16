@@ -2,13 +2,18 @@
  * kimi-usage.ts — Kimi Coding subscription usage windows.
  *
  * Fetches the quota snapshot from the Kimi Coding API
- * (`GET {baseUrl}/usages`) and exposes the two windows the statusline
+ * (`GET {baseUrl}/usages`) and exposes the windows the statusline
  * renders as progress bars:
  *
- *   - `weekly`   — the rolling weekly window (`usage` in the payload).
  *   - `fiveHour` — the short rate-limit window (`limits[0]`, normally
  *                  300 minutes, labelled from the payload's window
  *                  duration so a different window still reads right).
+ *   - `weekly`   — the rolling weekly window (`usage` in the payload).
+ *                  Older payload shape; the API no longer returns it.
+ *   - `monthly`  — the monthly quota window
+ *                  (`usages.limit_month_total`, falling back to
+ *                  `limit_month_code`), exposed as a used_ratio the
+ *                  parser maps onto a 0-100 scale.
  *
  * Auth: the OAuth access token pi's `kimi-coding` provider stores in
  * `~/.pi/agent/auth.json`. The file is re-read on every fetch so token
@@ -39,6 +44,7 @@ export interface KimiWindowUsage {
 export interface KimiUsageSnapshot {
   weekly: KimiWindowUsage | null;
   fiveHour: KimiWindowUsage | null;
+  monthly: KimiWindowUsage | null;
 }
 
 const USAGE_TTL_MS = 60_000;
@@ -129,6 +135,23 @@ function windowLabel(value: unknown): string {
   return minutes % 60 === 0 ? `${minutes / 60}h` : `${minutes}m`;
 }
 
+/** Parse the monthly `used_ratio` entry into a window row. */
+function parseMonthlyRow(value: unknown): KimiWindowUsage | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  const ratio = toNumber(record.used_ratio);
+  if (ratio === null || ratio < 0) return null;
+  const resetTime = getResetTime(record);
+  return {
+    label: "mo",
+    // Map the 0-1 ratio onto a 0-100 scale so the shared used/limit
+    // bar renderer drives the percentage directly.
+    used: Math.round(Math.min(ratio, 1) * 1000) / 10,
+    limit: 100,
+    ...(resetTime ? { resetTime } : {}),
+  };
+}
+
 /** Parse the `/usages` payload into a snapshot; null when unusable. */
 export function parseUsagePayload(payload: unknown): KimiUsageSnapshot | null {
   if (typeof payload !== "object" || payload === null || Array.isArray(payload)) return null;
@@ -149,8 +172,19 @@ export function parseUsagePayload(payload: unknown): KimiUsageSnapshot | null {
     }
   }
 
-  if (!weekly && !fiveHour) return null;
-  return { weekly, fiveHour };
+  let monthly: KimiWindowUsage | null = null;
+  if (
+    typeof record.usages === "object" &&
+    record.usages !== null &&
+    !Array.isArray(record.usages)
+  ) {
+    const usages = record.usages as Record<string, unknown>;
+    monthly =
+      parseMonthlyRow(usages.limit_month_total) ?? parseMonthlyRow(usages.limit_month_code);
+  }
+
+  if (!weekly && !fiveHour && !monthly) return null;
+  return { weekly, fiveHour, monthly };
 }
 
 async function fetchUsage(): Promise<void> {

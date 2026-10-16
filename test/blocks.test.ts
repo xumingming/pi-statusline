@@ -209,6 +209,7 @@ test("kimi usage blocks hidden without a snapshot, shown with data", () => {
   const usage = {
     weekly: { label: "wk", used: 9, limit: 100 },
     fiveHour: { label: "5h", used: 43, limit: 100 },
+    monthly: null,
   };
   const line = composeStatusLine(layout, makeInputs({ kimiUsage: usage }));
   assert.ok(line.includes("<gray>5h</> <success>43%</>"), "5h block with low fill");
@@ -222,7 +223,7 @@ test("kimi usage bars shift success -> warning -> error with fill level", () => 
     composeStatusLine(
       layout,
       makeInputs({
-        kimiUsage: { weekly: { label: "wk", used, limit: 100 }, fiveHour: null },
+        kimiUsage: { weekly: { label: "wk", used, limit: 100 }, fiveHour: null, monthly: null },
       }),
     );
 
@@ -243,6 +244,7 @@ test("kimi weekly block shows when the window ends", () => {
   const usage = {
     weekly: { label: "wk", used: 9, limit: 100, resetTime },
     fiveHour: null,
+    monthly: null,
   };
   const line = composeStatusLine(layout, makeInputs({ kimiUsage: usage }));
   assert.ok(
@@ -253,7 +255,7 @@ test("kimi weekly block shows when the window ends", () => {
   const noReset = composeStatusLine(
     layout,
     makeInputs({
-      kimiUsage: { weekly: { label: "wk", used: 9, limit: 100 }, fiveHour: null },
+      kimiUsage: { weekly: { label: "wk", used: 9, limit: 100 }, fiveHour: null, monthly: null },
     }),
   );
   assert.ok(!noReset.includes("ends"), "no ends segment without resetTime");
@@ -264,6 +266,7 @@ test("kimi weekly block shows when the window ends", () => {
       kimiUsage: {
         weekly: { label: "wk", used: 9, limit: 100, resetTime: "not-a-date" },
         fiveHour: null,
+        monthly: null,
       },
     }),
   );
@@ -277,10 +280,42 @@ test("kimi usage blocks can be disabled via layout", () => {
   const usage = {
     weekly: { label: "wk", used: 9, limit: 100 },
     fiveHour: { label: "5h", used: 43, limit: 100 },
+    monthly: { label: "mo", used: 4, limit: 100 },
   };
   const line = composeStatusLine(layout, makeInputs({ kimiUsage: usage, layout }));
   assert.ok(!line.includes("43%"), "5h block disabled");
   assert.ok(!line.includes("9%"), "weekly block disabled");
+  assert.ok(line.includes("<gray>mo</> <success>4%</>"), "monthly block still enabled");
+});
+
+test("kimi monthly block shows fill and end time", () => {
+  const layout = cloneDefaultLayout();
+  const resetTime = "2026-11-15T00:00:00Z";
+  const d = new Date(resetTime);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const expected =
+    `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ` +
+    `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+
+  const usage = {
+    weekly: null,
+    fiveHour: null,
+    monthly: { label: "mo", used: 4, limit: 100, resetTime },
+  };
+  const line = composeStatusLine(layout, makeInputs({ kimiUsage: usage }));
+  assert.ok(line.includes("<gray>mo</> <success>4%</>"), "monthly block with low fill");
+  assert.ok(
+    line.includes(`<gray>ends ${expected}</>`),
+    "monthly block shows local reset time",
+  );
+
+  const noReset = composeStatusLine(
+    layout,
+    makeInputs({
+      kimiUsage: { weekly: null, fiveHour: null, monthly: { label: "mo", used: 4, limit: 100 } },
+    }),
+  );
+  assert.ok(!noReset.includes("ends"), "no ends segment without resetTime");
 });
 
 test("go usage bars appear only with an opencode-go snapshot and only when enabled", () => {

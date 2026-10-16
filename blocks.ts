@@ -8,7 +8,8 @@
  *      ANSI constants, so the statusline follows `/theme` switches.
  *   2. Trimmed to the core blocks: model, path, git, context, cost,
  *      tokens, throughput — plus Kimi subscription usage bars
- *      (kimi-5h, kimi-weekly) fed by kimi-usage.ts and OpenCode Go
+ *      (kimi-5h, kimi-weekly, kimi-monthly) fed by kimi-usage.ts and
+ *      OpenCode Go
  *      usage bars (go-5h, go-weekly, go-monthly) fed by go-usage.ts.
  *      The notify-chips
  *      and stash blocks (which depended on the events bus / stash
@@ -190,6 +191,7 @@ export const KNOWN_BLOCK_IDS = [
   "context",
   "kimi-5h",
   "kimi-weekly",
+  "kimi-monthly",
   "go-5h",
   "go-weekly",
   "go-monthly",
@@ -351,6 +353,17 @@ const renderKimiWeekly: BlockRenderer = (inputs) => {
   return `${base} ${p.GRAY}ends ${reset}${p.RESET}`;
 };
 
+/** `kimi-monthly` block — monthly quota window plus its end time. */
+const renderKimiMonthly: BlockRenderer = (inputs) => {
+  const row = inputs.kimiUsage?.monthly;
+  if (!row) return "";
+  const p = inputs.palette;
+  const base = renderUsageWindow(row, p);
+  const reset = formatResetTime(row.resetTime);
+  if (!reset) return base;
+  return `${base} ${p.GRAY}ends ${reset}${p.RESET}`;
+};
+
 /**
  * Shared renderer for the OpenCode Go usage-window blocks: a dim
  * label, the fill percent colored by level, and a progress bar. The
@@ -477,6 +490,7 @@ export const BLOCK_RENDERERS: Record<BlockId, BlockRenderer> = {
   context: renderContext,
   "kimi-5h": renderKimiFiveHour,
   "kimi-weekly": renderKimiWeekly,
+  "kimi-monthly": renderKimiMonthly,
   "go-5h": renderGoFiveHour,
   "go-weekly": renderGoWeekly,
   "go-monthly": renderGoMonthly,

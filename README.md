@@ -10,7 +10,7 @@ Renders a compact one-line status row above the editor, with the editor's
 top/bottom borders stripped so the two visually merge:
 
 ```
-─ 🤖 Kimi K3 🧠 high │ spark │ master ✓ │ $2.02 │ ↑639k ↓88k R6.3M │ 12%: 127k[▓░░░░░░░░░]893k │ 5h 43%[▓▓▓▓░░░░░░] │ wk 9%[▓░░░░░░░░░]
+─ 🤖 Kimi K3 🧠 high │ spark │ master ✓ │ $2.02 │ ↑639k ↓88k R6.3M │ 12%: 127k[▓░░░░░░░░░]893k │ 5h 43%[▓▓▓▓░░░░░░] │ wk 9%[▓░░░░░░░░░] │ mo 4%[▓░░░░░░░░░]
 ```
 
 Blocks (left to right, all auto-hide when irrelevant):
@@ -35,10 +35,12 @@ Blocks (left to right, all auto-hide when irrelevant):
 - **Context** — percentage of the usable context window before
   autocompaction (33k buffer reserved), with a progress bar that shifts
   success → warning → error as it fills.
-- **Kimi 5h / Kimi weekly** — Kimi Coding subscription quota windows
-  (short rate-limit window and weekly window), shown only when the
-  active model is served by Kimi. Polled from the `/usages` API once a
-  minute using the `kimi-coding` OAuth token from `~/.pi/agent/auth.json`.
+- **Kimi 5h / Kimi weekly / Kimi monthly** — Kimi Coding subscription
+  quota windows (short rate-limit window, weekly window, monthly quota),
+  shown only when the active model is served by Kimi. Polled from the
+  `/usages` API once a minute using the `kimi-coding` OAuth token from
+  `~/.pi/agent/auth.json`; the weekly and monthly blocks also show when
+  their window ends.
 - **Go 5h / Go weekly / Go monthly** — OpenCode Go plan quota windows
   (rolling 5h, weekly, monthly), shown only when the active model is
   served by the `opencode-go` provider. Polled from the `/usage` API
@@ -98,7 +100,7 @@ restart pi after edits):
 {
   "iconSet": "nerd-font",
   "layout": {
-    "order": ["model", "path", "git", "context", "kimi-5h", "kimi-weekly", "cost", "tokens", "throughput"],
+    "order": ["model", "path", "git", "context", "kimi-5h", "kimi-weekly", "kimi-monthly", "cost", "tokens", "throughput"],
     "enabled": { "cost": false },
     "separator": "│",
     "model": { "showThinking": true },

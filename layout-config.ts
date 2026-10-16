@@ -78,6 +78,7 @@ export const DEFAULT_LAYOUT_CONFIG: LayoutConfig = Object.freeze({
     context: true,
     "kimi-5h": true,
     "kimi-weekly": true,
+    "kimi-monthly": true,
     "go-5h": true,
     "go-weekly": true,
     "go-monthly": true,

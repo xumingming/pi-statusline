@@ -33,6 +33,38 @@ test("parseUsagePayload extracts weekly and 5h windows", () => {
   });
 });
 
+test("parseUsagePayload extracts the monthly window from usages.limit_month_total", () => {
+  const snapshot = parseUsagePayload({
+    usages: {
+      limit_5h: { used_ratio: 0.0494, reset_time: "2026-10-16T10:24:29Z" },
+      limit_month_total: { used_ratio: 0.04, reset_time: "2026-11-15T00:00:00Z" },
+      limit_month_code: { used_ratio: 0.03, reset_time: "2026-11-15T00:00:00Z" },
+    },
+  });
+
+  assert.deepEqual(snapshot?.monthly, {
+    label: "mo",
+    used: 4,
+    limit: 100,
+    resetTime: "2026-11-15T00:00:00Z",
+  });
+});
+
+test("parseUsagePayload falls back to limit_month_code when total is absent", () => {
+  const snapshot = parseUsagePayload({
+    usages: { limit_month_code: { used_ratio: 0.25, reset_time: "2026-11-15T00:00:00Z" } },
+  });
+
+  assert.equal(snapshot?.monthly?.used, 25);
+});
+
+test("parseUsagePayload returns null when monthly data is unusable", () => {
+  assert.equal(
+    parseUsagePayload({ usages: { limit_month_total: { used_ratio: "nope" } } }),
+    null,
+  );
+});
+
 test("parseUsagePayload derives used from limit - remaining", () => {
   const snapshot = parseUsagePayload({
     usage: { limit: 100, remaining: 91 },

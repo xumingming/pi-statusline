@@ -2,7 +2,7 @@
  * pi-statusline — compact one-line statusline for pi.
  *
  * Forked from @wierdbytes/pi-statusline (MIT), trimmed to the rendering
- * core: model/thinking, path, git, context, cost, tokens — plus two
+ * core: model/thinking, path, git, context, cost, tokens — plus three
  * Kimi subscription usage bars and three OpenCode Go usage bars, shown
  * when the matching provider serves the active model. Colors are
  * derived from the active pi theme at render time (see blocks.ts), so
