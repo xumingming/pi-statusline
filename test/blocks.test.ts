@@ -595,11 +595,26 @@ test("cost multiple hides while a subscription quota bar is showing", () => {
       kimiUsage: {
         weekly: { label: "wk", used: 9, limit: 100 },
         fiveHour: { label: "5h", used: 43, limit: 100 },
+        monthly: null,
       },
     }),
   );
   assert.ok(kimi.includes("5h"), "quota bar is showing");
   assert.ok(!kimi.includes("x</>"), "no multiple beside a kimi bar");
+
+  const kimiMonthly = composeStatusLine(
+    layout,
+    makeInputs({
+      ...priced,
+      kimiUsage: {
+        weekly: null,
+        fiveHour: null,
+        monthly: { label: "mo", used: 4, limit: 100 },
+      },
+    }),
+  );
+  assert.ok(kimiMonthly.includes("mo"), "monthly quota bar is showing");
+  assert.ok(!kimiMonthly.includes("x</>"), "no multiple beside a kimi monthly bar");
 
   const go = composeStatusLine(
     layout,
@@ -626,7 +641,10 @@ test("cost multiple hides while a subscription quota bar is showing", () => {
   assert.ok(!cursor.includes("10x"), "no multiple beside a cursor bar");
 
   const disabled = normaliseLayoutConfig({
-    enabled: { "kimi-5h": false, "kimi-weekly": false } as Record<BlockId, boolean>,
+    enabled: { "kimi-5h": false, "kimi-weekly": false, "kimi-monthly": false } as Record<
+      BlockId,
+      boolean
+    >,
   });
   const fallback = composeStatusLine(
     disabled,
@@ -636,6 +654,7 @@ test("cost multiple hides while a subscription quota bar is showing", () => {
       kimiUsage: {
         weekly: { label: "wk", used: 9, limit: 100 },
         fiveHour: { label: "5h", used: 43, limit: 100 },
+        monthly: { label: "mo", used: 4, limit: 100 },
       },
     }),
   );

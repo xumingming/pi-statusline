@@ -394,7 +394,12 @@ export type BlockRenderer = (inputs: RenderInputs) => string;
 function quotaBarsShowing(inputs: RenderInputs): boolean {
   const on = inputs.layout.enabled;
   const kimi = inputs.kimiUsage;
-  if (kimi && ((on["kimi-5h"] && kimi.fiveHour) || (on["kimi-weekly"] && kimi.weekly))) {
+  if (
+    kimi &&
+    ((on["kimi-5h"] && kimi.fiveHour) ||
+      (on["kimi-weekly"] && kimi.weekly) ||
+      (on["kimi-monthly"] && kimi.monthly))
+  ) {
     return true;
   }
   const go = inputs.goUsage;
