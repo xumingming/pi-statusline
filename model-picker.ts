@@ -6,7 +6,7 @@
  * `/model-with-pricing-multiplier` command listing every available chat
  * model as `<id> [<provider>] (<cost multiple>)`, current model first.
  * In the TUI the picker is a custom editor (see PickerEditor) with a
- * windowed list, type-to-filter, and arrow-key navigation — the generic
+ * windowed list, fuzzy search, and arrow-key navigation — the generic
  * ui.select() dialog renders every row and overflows with long catalogs.
  * In RPC mode it falls back to ui.select(). Picking a row switches the
  * session model via `pi.setModel()`.
@@ -19,7 +19,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import type { Api, Model } from "@earendil-works/pi-ai";
 import type { EditorComponent, EditorTheme, TUI } from "@earendil-works/pi-tui";
-import { truncateToWidth } from "@earendil-works/pi-tui";
+import { fuzzyFilter, truncateToWidth } from "@earendil-works/pi-tui";
 
 import {
   findBaselineCost,
@@ -93,6 +93,16 @@ export function visibleWindow(
   return { start, end: Math.min(start + maxVisible, length) };
 }
 
+/**
+ * Fuzzy-filter rows the same way `/model` ranks its list: characters
+ * in order, whitespace/slash tokens all must match, best first.
+ */
+export function fuzzyFilterLabels(labels: readonly string[], query: string): string[] {
+  const q = query.trim();
+  if (!q) return [...labels];
+  return fuzzyFilter([...labels], q, (label) => label);
+}
+
 interface PickerCallbacks {
   onPick(label: string): void;
   /** Restore the normal editor and repaint; called on pick and cancel. */
@@ -155,10 +165,7 @@ class PickerEditor extends CustomEditor {
 
   private refilter(query: string): void {
     this.query = query;
-    const q = query.toLowerCase();
-    this.visible = q
-      ? this.allLabels.filter((l) => l.toLowerCase().includes(q))
-      : this.allLabels;
+    this.visible = fuzzyFilterLabels(this.allLabels, query);
     this.selectedIndex = 0;
   }
 
@@ -181,7 +188,7 @@ class PickerEditor extends CustomEditor {
       lines.push(truncateToWidth(colored, width));
     }
     if (this.visible.length === 0) lines.push(`${p.GRAY}  no matching models${p.RESET}`);
-    lines.push(`${p.GRAY}type to filter, ↑↓ move, Enter select, Esc cancel${p.RESET}`);
+    lines.push(`${p.GRAY}type to fuzzy search, ↑↓ move, Enter select, Esc cancel${p.RESET}`);
     return lines;
   }
 }

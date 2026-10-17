@@ -134,7 +134,9 @@ command: a model picker whose rows carry the same cost multiple as the
 statusline badge, e.g. `grok-4.7 [cursor] (10x)`. The current model is
 listed first with a `* ` marker; unpriced models show no multiple.
 Pass a query to pre-filter the list (`/model-with-pricing-multiplier
-grok`); type while the picker is open to filter further. The list is
+grok`); type while the picker is open to fuzzy-search the rows —
+same matching as `/model` (characters in order, all whitespace tokens
+must match, best first). The list is
 windowed (10 rows) and follows the selection — ↑↓ move, Enter selects,
 Esc cancels — so long catalogs stay readable. Picking a row switches
 the session model. The baseline is the configured `costBaseline`.

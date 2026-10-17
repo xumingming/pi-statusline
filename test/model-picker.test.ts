@@ -6,6 +6,7 @@ import type { Api, Model } from "@earendil-works/pi-ai";
 import {
   buildModelOptions,
   filterModelOptions,
+  fuzzyFilterLabels,
   registerModelPicker,
   visibleWindow,
   type ModelOption,
@@ -85,6 +86,26 @@ test("visibleWindow slides to follow the selection", () => {
   assert.deepEqual(visibleWindow(30, 25, 10), { start: 20, end: 30 });
   // The last rows are always fully visible.
   assert.deepEqual(visibleWindow(30, 29, 10), { start: 20, end: 30 });
+});
+
+test("fuzzyFilterLabels ranks like /model: ordered chars, tokens, best first", () => {
+  const labels = [
+    "claude-sonnet-5 [anthropic] (9x)",
+    "claude-opus-4-8 [anthropic] (20x)",
+    "grok-4.7 [xai] (10x)",
+  ];
+  assert.deepEqual(fuzzyFilterLabels(labels, ""), labels, "blank query keeps order");
+  assert.deepEqual(
+    fuzzyFilterLabels(labels, "cop48").map((l) => l.split(" ")[0]),
+    ["claude-opus-4-8"],
+    "characters match in order; sonnet has no p",
+  );
+  assert.deepEqual(
+    fuzzyFilterLabels(labels, "xai grok"),
+    ["grok-4.7 [xai] (10x)"],
+    "whitespace tokens all must match",
+  );
+  assert.deepEqual(fuzzyFilterLabels(labels, "zzz"), [], "no match empties the list");
 });
 
 test("registerModelPicker selects a model via pi.setModel", async () => {
