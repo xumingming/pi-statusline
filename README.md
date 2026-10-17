@@ -127,6 +127,16 @@ and missing ones appended.
 path block, 1-3 (default 1: directory name only). Set `3` to show
 `…/parent/dir` again.
 
+## `/mp` — model picker with cost multiples
+
+The extension also registers a `/mp` command: a model picker whose rows
+carry the same cost multiple as the statusline badge, e.g.
+`grok-4.7 [cursor] (10x)`. The current model is listed first with a
+`* ` marker; unpriced models show no multiple. Pass a query to narrow
+the list (`/mp grok`); picking a row switches the session model.
+Unlike `/model` there is no fuzzy search — rows filter by substring.
+The baseline is the configured `costBaseline`.
+
 ## Development
 
 ```bash

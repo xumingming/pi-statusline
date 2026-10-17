@@ -11,7 +11,9 @@
  * What was dropped from the original: the settings modal, prompt stash,
  * notify chips/toasts, subagents bridge, and the fixed-editor
  * compositor. The layout + icon set are configurable via an optional
- * JSON file at ~/.pi/agent/pi-statusline.json:
+ * JSON file at ~/.pi/agent/pi-statusline.json. The extension also
+ * registers a `/mp` command — a model picker whose rows carry the
+ * cost multiple (see model-picker.ts):
  *
  *   {
  *     "iconSet": "nerd-font" | "plain" | "ascii" | "minimal" | "emoji",
@@ -48,6 +50,7 @@ import { DEFAULT_ICON_SET, isIconSet, type IconSet } from "./icons.ts";
 import { getKimiUsage, onKimiUsageUpdate } from "./kimi-usage.ts";
 import { getGoUsage, onGoUsageUpdate } from "./go-usage.ts";
 import { getCursorUsage, onCursorUsageUpdate } from "./cursor-usage.ts";
+import { registerModelPicker } from "./model-picker.ts";
 import { cloneDefaultLayout, normaliseLayoutConfig, type LayoutConfig } from "./layout-config.ts";
 import {
   getThroughput,
@@ -253,6 +256,9 @@ class EmptyFooter implements Component {
 export default function (pi: ExtensionAPI) {
   let activeTui: TUI | undefined;
   let config: StatuslineConfig = loadConfig();
+
+  // `/mp` — model picker whose rows carry the cost multiple.
+  registerModelPicker(pi, () => config.costBaseline);
 
   // Repaint when a fresh usage snapshot lands in the background.
   onKimiUsageUpdate(() => activeTui?.requestRender());
