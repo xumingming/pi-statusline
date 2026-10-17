@@ -394,8 +394,9 @@ function costRatioColor(value: number, palette: Palette): string {
 }
 
 /**
- * `model` block — icon + display name, then the cost multiple versus
- * the baseline (no brackets; the context bar already uses those),
+ * `model` block — icon + display name, then the cost multiple in
+ * parentheses versus the baseline (square brackets are taken by the
+ * context bar),
  * then an optional inline thinking-level segment when (a) the active
  * model is reasoning-capable and (b) `layout.model.showThinking === true`.
  * The multiple and the thinking level both live inside this block:
@@ -405,7 +406,7 @@ const renderModel: BlockRenderer = (inputs) => {
   const p = inputs.palette;
   let head = `${p.ACCENT}${resolveIcon(inputs.iconSet, "model")} ${inputs.modelName}${p.RESET}`;
   const ratio = modelCostRatio(inputs.modelCost, inputs.baselineCost);
-  if (ratio) head += ` ${costRatioColor(ratio.value, p)}${ratio.label}${p.RESET}`;
+  if (ratio) head += ` ${costRatioColor(ratio.value, p)}(${ratio.label})${p.RESET}`;
   if (!inputs.modelReasoning || !inputs.layout.model.showThinking) return head;
   const label = resolveThinkingLabel(inputs.thinkingLevel, inputs.thinkingLevelMap);
   const icon = resolveIcon(inputs.iconSet, "thinking");

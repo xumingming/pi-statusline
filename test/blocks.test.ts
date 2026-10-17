@@ -539,8 +539,8 @@ test("model block shows the cost multiple after the name and before thinking", (
       baselineCost: FLASH,
     }),
   );
-  assert.match(line, /\[m\] Grok 4\.7<\/> <warning>10x<\/>/);
-  assert.ok(line.indexOf("10x") < line.indexOf("<thinkHigh>"), "multiple before thinking");
+  assert.match(line, /\[m\] Grok 4\.7<\/> <warning>\(10x\)<\/>/);
+  assert.ok(line.indexOf("(10x)") < line.indexOf("<thinkHigh>"), "multiple before thinking");
   assert.ok(!line.includes("[10x]"), "no brackets around the multiple");
   assert.ok(!line.includes("10x]"), "no closing bracket after the multiple");
 });
@@ -553,10 +553,10 @@ test("cost multiple color follows 4x / 20x thresholds", () => {
       makeInputs({ modelName: name, modelCost: cost, baselineCost: FLASH, modelReasoning: false }),
     );
 
-  assert.match(at("Haiku 5.5", HAIKU_55), /<gray>0\.5x<\/>/);
-  assert.match(at("Grok 4.3", GROK_43), /<gray>4x<\/>/);
-  assert.match(at("Opus 4.8", OPUS_48), /<warning>20x<\/>/);
-  assert.match(at("Fable 5", FABLE_5), /<error>50x<\/>/);
+  assert.match(at("Haiku 5.5", HAIKU_55), /<gray>\(0\.5x\)<\/>/);
+  assert.match(at("Grok 4.3", GROK_43), /<gray>\(4x\)<\/>/);
+  assert.match(at("Opus 4.8", OPUS_48), /<warning>\(20x\)<\/>/);
+  assert.match(at("Fable 5", FABLE_5), /<error>\(50x\)<\/>/);
 });
 
 test("cost multiple stays when thinking is hidden, and hides with no price", () => {
@@ -565,7 +565,7 @@ test("cost multiple stays when thinking is hidden, and hides with no price", () 
     layout,
     makeInputs({ layout, modelName: "Grok 4.7", modelCost: GROK_47, baselineCost: FLASH }),
   );
-  assert.match(shown, /Grok 4\.7<\/> <warning>10x<\/>/);
+  assert.match(shown, /Grok 4\.7<\/> <warning>\(10x\)<\/>/);
   assert.ok(!shown.includes("<thinkHigh>"), "thinking still off");
 
   const unpriced = composeStatusLine(
@@ -600,7 +600,7 @@ test("cost multiple stays while a subscription quota bar is showing", () => {
     }),
   );
   assert.ok(kimi.includes("5h"), "quota bar is showing");
-  assert.match(kimi, /<warning>10x<\/>/, "multiple beside a kimi bar");
+  assert.match(kimi, /<warning>\(10x\)<\/>/, "multiple beside a kimi bar");
 
   const kimiMonthly = composeStatusLine(
     layout,
@@ -614,7 +614,7 @@ test("cost multiple stays while a subscription quota bar is showing", () => {
     }),
   );
   assert.ok(kimiMonthly.includes("mo"), "monthly quota bar is showing");
-  assert.match(kimiMonthly, /<warning>10x<\/>/, "multiple beside a kimi monthly bar");
+  assert.match(kimiMonthly, /<warning>\(10x\)<\/>/, "multiple beside a kimi monthly bar");
 
   const go = composeStatusLine(
     layout,
@@ -628,7 +628,7 @@ test("cost multiple stays while a subscription quota bar is showing", () => {
       },
     }),
   );
-  assert.match(go, /<warning>10x<\/>/, "multiple beside a go bar");
+  assert.match(go, /<warning>\(10x\)<\/>/, "multiple beside a go bar");
 
   const cursor = composeStatusLine(
     layout,
@@ -639,5 +639,5 @@ test("cost multiple stays while a subscription quota bar is showing", () => {
     }),
   );
   assert.ok(cursor.includes("cur"), "cursor bar is showing");
-  assert.match(cursor, /Grok 4\.7<\/> <warning>10x<\/>/, "multiple beside a cursor bar");
+  assert.match(cursor, /Grok 4\.7<\/> <warning>\(10x\)<\/>/, "multiple beside a cursor bar");
 });

@@ -19,7 +19,7 @@ Blocks (left to right, all auto-hide when irrelevant):
   model, and an inline thinking-level segment for reasoning-capable
   models. The multiple is how many times a typical turn costs versus
   the baseline (default `deepseek-flash`): 10% fresh input, 5% output,
-  85% cache read, rounded to one significant figure (`Grok 4.7 10x`).
+  85% cache read, rounded to one significant figure (`Grok 4.7 (10x)`).
   A catalog `cacheRead` of 0 is charged at the input price. Hidden when
   the model is unpriced. Dim through `4x`, warning through `20x`, error
   above that. Thinking colors use the theme's `thinkingOff`…`thinkingMax`
