@@ -127,15 +127,17 @@ and missing ones appended.
 path block, 1-3 (default 1: directory name only). Set `3` to show
 `…/parent/dir` again.
 
-## `/mp` — model picker with cost multiples
+## `/model-with-pricing-multiplier` — model picker with cost multiples
 
-The extension also registers a `/mp` command: a model picker whose rows
-carry the same cost multiple as the statusline badge, e.g.
-`grok-4.7 [cursor] (10x)`. The current model is listed first with a
-`* ` marker; unpriced models show no multiple. Pass a query to narrow
-the list (`/mp grok`); picking a row switches the session model.
-Unlike `/model` there is no fuzzy search — rows filter by substring.
-The baseline is the configured `costBaseline`.
+The extension also registers a `/model-with-pricing-multiplier`
+command: a model picker whose rows carry the same cost multiple as the
+statusline badge, e.g. `grok-4.7 [cursor] (10x)`. The current model is
+listed first with a `* ` marker; unpriced models show no multiple.
+Pass a query to pre-filter the list (`/model-with-pricing-multiplier
+grok`); type while the picker is open to filter further. The list is
+windowed (10 rows) and follows the selection — ↑↓ move, Enter selects,
+Esc cancels — so long catalogs stay readable. Picking a row switches
+the session model. The baseline is the configured `costBaseline`.
 
 ## Development
 

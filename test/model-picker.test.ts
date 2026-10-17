@@ -7,6 +7,7 @@ import {
   buildModelOptions,
   filterModelOptions,
   registerModelPicker,
+  visibleWindow,
   type ModelOption,
 } from "../model-picker.ts";
 import type { ModelCostRates } from "../blocks.ts";
@@ -74,6 +75,18 @@ test("filterModelOptions matches provider/id and name, case-insensitively", () =
   assert.equal(filterModelOptions(options, "  ").length, 2, "blank query keeps all");
 });
 
+test("visibleWindow slides to follow the selection", () => {
+  // Short lists show everything from row 0.
+  assert.deepEqual(visibleWindow(5, 3, 10), { start: 0, end: 5 });
+  // The selection stays centered until the window hits the end.
+  assert.deepEqual(visibleWindow(30, 0, 10), { start: 0, end: 10 });
+  assert.deepEqual(visibleWindow(30, 5, 10), { start: 0, end: 10 });
+  assert.deepEqual(visibleWindow(30, 8, 10), { start: 3, end: 13 });
+  assert.deepEqual(visibleWindow(30, 25, 10), { start: 20, end: 30 });
+  // The last rows are always fully visible.
+  assert.deepEqual(visibleWindow(30, 29, 10), { start: 20, end: 30 });
+});
+
 test("registerModelPicker selects a model via pi.setModel", async () => {
   const grok = makeModel("xai", "grok-4.7", GROK_47);
   const flash = makeModel("deepseek", "deepseek-flash", FLASH);
@@ -91,8 +104,8 @@ test("registerModelPicker selects a model via pi.setModel", async () => {
       return model === grok;
     },
   };
-  registerModelPicker(fakePi as never, () => "deepseek-flash");
-  assert.equal(registered?.name, "mp");
+  registerModelPicker(fakePi as never, () => "deepseek-flash", (() => ({})) as never, () => {});
+  assert.equal(registered?.name, "model-with-pricing-multiplier");
 
   const fakeCtx = {
     hasUI: true,
@@ -125,7 +138,7 @@ test("registerModelPicker notifies when auth is missing, and on no matches", asy
     },
     setModel: async () => false,
   };
-  registerModelPicker(fakePi as never, () => "deepseek-flash");
+  registerModelPicker(fakePi as never, () => "deepseek-flash", (() => ({})) as never, () => {});
 
   const fakeCtx = {
     hasUI: true,
@@ -161,7 +174,7 @@ test("registerModelPicker is a no-op without a UI", async () => {
       return true;
     },
   };
-  registerModelPicker(fakePi as never, () => "deepseek-flash");
+  registerModelPicker(fakePi as never, () => "deepseek-flash", (() => ({})) as never, () => {});
   await registered!.handler("", { hasUI: false } as never);
   assert.equal(setModelCalls, 0, "never touches the model");
 });

@@ -10,10 +10,9 @@
  *
  * What was dropped from the original: the settings modal, prompt stash,
  * notify chips/toasts, subagents bridge, and the fixed-editor
- * compositor. The layout + icon set are configurable via an optional
- * JSON file at ~/.pi/agent/pi-statusline.json. The extension also
- * registers a `/mp` command — a model picker whose rows carry the
- * cost multiple (see model-picker.ts):
+ * picker whose rows carry the cost multiple (see model-picker.ts).
+ * The layout + icon set are configurable via an optional JSON file at
+ * ~/.pi/agent/pi-statusline.json:
  *
  *   {
  *     "iconSet": "nerd-font" | "plain" | "ascii" | "minimal" | "emoji",
@@ -256,9 +255,15 @@ class EmptyFooter implements Component {
 export default function (pi: ExtensionAPI) {
   let activeTui: TUI | undefined;
   let config: StatuslineConfig = loadConfig();
+  const editorFactory = makeEditorFactory((tui) => {
+    activeTui = tui;
+  });
 
-  // `/mp` — model picker whose rows carry the cost multiple.
-  registerModelPicker(pi, () => config.costBaseline);
+  // `/model-with-pricing-multiplier` — model picker whose rows carry
+  // the cost multiple; swaps the editor while open and restores ours.
+  registerModelPicker(pi, () => config.costBaseline, editorFactory, () =>
+    activeTui?.requestRender(),
+  );
 
   // Repaint when a fresh usage snapshot lands in the background.
   onKimiUsageUpdate(() => activeTui?.requestRender());
@@ -281,9 +286,7 @@ export default function (pi: ExtensionAPI) {
       }),
       { placement: "aboveEditor" },
     );
-    ctx.ui.setEditorComponent(makeEditorFactory((tui) => {
-      activeTui = tui;
-    }));
+    ctx.ui.setEditorComponent(editorFactory);
     ctx.ui.setFooter(() => new EmptyFooter());
     activeTui?.requestRender();
   });
