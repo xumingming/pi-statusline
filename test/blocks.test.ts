@@ -5,11 +5,15 @@ import type { Theme } from "@earendil-works/pi-coding-agent";
 
 import {
   composeStatusLine,
+  findBaselineCost,
   type BlockId,
   formatTokens,
+  modelCostRatio,
+  normaliseCostBaseline,
   paletteFromTheme,
   shortenModelName,
   shortenPath,
+  type ModelCostRates,
   type Palette,
   type RenderInputs,
 } from "../blocks.ts";
@@ -58,6 +62,8 @@ function makeInputs(overrides: Partial<RenderInputs> = {}): RenderInputs {
     kimiUsage: null,
     goUsage: null,
     cursorUsage: null,
+    modelCost: null,
+    baselineCost: null,
     iconSet: "ascii",
     layout: cloneDefaultLayout(),
     ...overrides,
@@ -457,4 +463,182 @@ test("format helpers", () => {
   assert.equal(shortenPath("/Users/abei/Code/spark", 3), "…/abei/Code/spark");
   assert.equal(shortenModelName({ name: "Claude Opus 4.7" }), "Opus 4.7");
   assert.equal(shortenModelName({ id: "anthropic/claude-opus" }), "claude-opus");
+});
+
+const FLASH: ModelCostRates = { input: 0.3, output: 1.2, cacheRead: 0.006, cacheWrite: 0 };
+const HAIKU_55: ModelCostRates = { input: 0.1, output: 0.5, cacheRead: 0.01, cacheWrite: 0.125 };
+const GROK_43: ModelCostRates = { input: 1.25, output: 2.5, cacheRead: 0.2, cacheWrite: 0 };
+const GROK_47: ModelCostRates = { input: 2, output: 6, cacheRead: 0.5, cacheWrite: 0 };
+const SONNET_5: ModelCostRates = { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5 };
+const GPT_54: ModelCostRates = { input: 2.5, output: 15, cacheRead: 0.25, cacheWrite: 0 };
+const OPUS_48: ModelCostRates = { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 };
+const FABLE_5: ModelCostRates = { input: 10, output: 50, cacheRead: 1, cacheWrite: 12.5 };
+
+test("cost multiple is one significant figure versus deepseek-flash", () => {
+  const label = (cost: ModelCostRates) => modelCostRatio(cost, FLASH)?.label;
+  assert.equal(label(FLASH), "1x");
+  assert.equal(label(HAIKU_55), "0.5x");
+  assert.equal(label(GROK_43), "4x");
+  assert.equal(label(GROK_47), "10x");
+  assert.equal(label(SONNET_5), "9x");
+  // ~13 rounds to one significant figure, same rule as 23 -> 20 and 46 -> 50.
+  assert.equal(label(GPT_54), "10x");
+  assert.equal(label(OPUS_48), "20x");
+  assert.equal(label(FABLE_5), "50x");
+  assert.equal(modelCostRatio(GROK_47, FLASH)?.value, 10);
+});
+
+test("zero cacheRead is charged at the input rate", () => {
+  const uncached = { input: 1.25, output: 2.5, cacheRead: 0, cacheWrite: 0 };
+  assert.equal(modelCostRatio(uncached, FLASH)?.label, "10x");
+});
+
+test("cost multiple hidden when either side is unpriced", () => {
+  const zero = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
+  const writeOnly = { input: 0, output: 0, cacheRead: 0, cacheWrite: 5 };
+  assert.equal(modelCostRatio(zero, FLASH), null);
+  assert.equal(modelCostRatio(writeOnly, FLASH), null);
+  assert.equal(modelCostRatio(GROK_47, zero), null);
+  assert.equal(modelCostRatio(null, FLASH), null);
+  assert.equal(modelCostRatio(GROK_47, null), null);
+});
+
+test("cost baseline id falls back unless it is a model id or provider/id", () => {
+  assert.equal(normaliseCostBaseline(undefined), "deepseek-flash");
+  assert.equal(normaliseCostBaseline(12), "deepseek-flash");
+  assert.equal(normaliseCostBaseline(""), "deepseek-flash");
+  assert.equal(normaliseCostBaseline("  "), "deepseek-flash");
+  assert.equal(normaliseCostBaseline("has space"), "deepseek-flash");
+  assert.equal(normaliseCostBaseline("  grok-4.7  "), "grok-4.7");
+  assert.equal(normaliseCostBaseline("deepseek/deepseek-flash"), "deepseek/deepseek-flash");
+});
+
+test("baseline lookup prefers priced deepseek, and provider/id pins one entry", () => {
+  const flash = { input: 0.3, output: 1.2, cacheRead: 0.006, cacheWrite: 0 };
+  const other = { input: 1, output: 1, cacheRead: 1, cacheWrite: 0 };
+  const zero = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
+  const models = [
+    { id: "deepseek-flash", provider: "cursor", cost: other },
+    { id: "deepseek-flash", provider: "deepseek", cost: zero },
+    { id: "deepseek-flash", provider: "deepseek", cost: flash },
+    { id: "grok-4.7", provider: "opencode-go", cost: other },
+  ];
+  assert.deepEqual(findBaselineCost(models, "deepseek-flash"), flash);
+  assert.deepEqual(findBaselineCost(models, "cursor/deepseek-flash"), other);
+  assert.equal(findBaselineCost(models, "missing"), null);
+  assert.equal(findBaselineCost(models, "nope/deepseek-flash"), null);
+});
+
+test("model block shows the cost multiple after the name and before thinking", () => {
+  const layout = cloneDefaultLayout();
+  const line = composeStatusLine(
+    layout,
+    makeInputs({
+      modelName: "Grok 4.7",
+      modelCost: GROK_47,
+      baselineCost: FLASH,
+    }),
+  );
+  assert.match(line, /\[m\] Grok 4\.7<\/> <warning>10x<\/>/);
+  assert.ok(line.indexOf("10x") < line.indexOf("<thinkHigh>"), "multiple before thinking");
+  assert.ok(!line.includes("[10x]"), "no brackets around the multiple");
+  assert.ok(!line.includes("10x]"), "no closing bracket after the multiple");
+});
+
+test("cost multiple color follows 4x / 20x thresholds", () => {
+  const layout = cloneDefaultLayout();
+  const at = (name: string, cost: ModelCostRates) =>
+    composeStatusLine(
+      layout,
+      makeInputs({ modelName: name, modelCost: cost, baselineCost: FLASH, modelReasoning: false }),
+    );
+
+  assert.match(at("Haiku 5.5", HAIKU_55), /<gray>0\.5x<\/>/);
+  assert.match(at("Grok 4.3", GROK_43), /<gray>4x<\/>/);
+  assert.match(at("Opus 4.8", OPUS_48), /<warning>20x<\/>/);
+  assert.match(at("Fable 5", FABLE_5), /<error>50x<\/>/);
+});
+
+test("cost multiple stays when thinking is hidden, and hides with no price", () => {
+  const layout = normaliseLayoutConfig({ model: { showThinking: false } });
+  const shown = composeStatusLine(
+    layout,
+    makeInputs({ layout, modelName: "Grok 4.7", modelCost: GROK_47, baselineCost: FLASH }),
+  );
+  assert.match(shown, /Grok 4\.7<\/> <warning>10x<\/>/);
+  assert.ok(!shown.includes("<thinkHigh>"), "thinking still off");
+
+  const unpriced = composeStatusLine(
+    layout,
+    makeInputs({
+      layout,
+      modelName: "Grok 4.7",
+      modelCost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      baselineCost: FLASH,
+    }),
+  );
+  assert.ok(!unpriced.includes("10x"), "unpriced model draws no multiple");
+  assert.ok(!unpriced.includes("x</>"), "no multiple label");
+});
+
+test("cost multiple hides while a subscription quota bar is showing", () => {
+  const layout = cloneDefaultLayout();
+  const priced = {
+    modelName: "Kimi K3",
+    modelCost: { input: 3, output: 15, cacheRead: 0.3, cacheWrite: 0 },
+    baselineCost: FLASH,
+  };
+  const kimi = composeStatusLine(
+    layout,
+    makeInputs({
+      ...priced,
+      kimiUsage: {
+        weekly: { label: "wk", used: 9, limit: 100 },
+        fiveHour: { label: "5h", used: 43, limit: 100 },
+      },
+    }),
+  );
+  assert.ok(kimi.includes("5h"), "quota bar is showing");
+  assert.ok(!kimi.includes("x</>"), "no multiple beside a kimi bar");
+
+  const go = composeStatusLine(
+    layout,
+    makeInputs({
+      ...priced,
+      modelName: "Grok 4.7",
+      goUsage: {
+        rolling: { label: "5h", percent: 1 },
+        weekly: null,
+        monthly: null,
+      },
+    }),
+  );
+  assert.ok(!go.includes("10x"), "no multiple beside a go bar");
+
+  const cursor = composeStatusLine(
+    layout,
+    makeInputs({
+      ...priced,
+      modelName: "Grok 4.7",
+      cursorUsage: { total: { label: "cur", percent: 12 }, auto: null, api: null },
+    }),
+  );
+  assert.ok(!cursor.includes("10x"), "no multiple beside a cursor bar");
+
+  const disabled = normaliseLayoutConfig({
+    enabled: { "kimi-5h": false, "kimi-weekly": false } as Record<BlockId, boolean>,
+  });
+  const fallback = composeStatusLine(
+    disabled,
+    makeInputs({
+      ...priced,
+      layout: disabled,
+      kimiUsage: {
+        weekly: { label: "wk", used: 9, limit: 100 },
+        fiveHour: { label: "5h", used: 43, limit: 100 },
+      },
+    }),
+  );
+  assert.ok(!fallback.includes("43%"), "quota bars disabled");
+  assert.match(fallback, /<warning>10x<\/>/, "multiple returns when the bars are off");
 });

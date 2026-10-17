@@ -15,9 +15,16 @@ top/bottom borders stripped so the two visually merge:
 
 Blocks (left to right, all auto-hide when irrelevant):
 
-- **Model** — icon + display name, with an inline thinking-level segment
-  for reasoning-capable models. Thinking colors use the theme's
-  `thinkingOff`…`thinkingMax` tokens.
+- **Model** — icon + display name, a cost multiple versus a baseline
+  model, and an inline thinking-level segment for reasoning-capable
+  models. The multiple is how many times a typical turn costs versus
+  the baseline (default `deepseek-flash`): 10% fresh input, 5% output,
+  85% cache read, rounded to one significant figure (`Grok 4.7 10x`).
+  A catalog `cacheRead` of 0 is charged at the input price. Hidden when
+  the model is unpriced, and while a Kimi, OpenCode Go, or Cursor quota
+  bar is showing. Dim through `4x`, warning through `20x`, error above
+  that. Thinking colors use the theme's `thinkingOff`…`thinkingMax`
+  tokens.
 - **Path** — trailing segments of `cwd` (directory name only by
   default), current directory accented. `layout.path.segments` controls
   how many segments are shown (1 = directory name only).
@@ -71,14 +78,14 @@ Blocks (left to right, all auto-hide when irrelevant):
 
 | Slot | Theme token | Used for |
 |---|---|---|
-| `ERROR` | `error` | dirty git marker, context bar > 80% |
-| `WARNING` | `warning` | context bar > 60% |
+| `ERROR` | `error` | dirty git marker, context bar > 80%, model multiple above `20x` |
+| `WARNING` | `warning` | context bar > 60%, model multiple above `4x` through `20x` |
 | `SUCCESS` | `success` | clean git marker, context bar ≤ 60% |
 | `CYAN` | `syntaxType` | git branch, live throughput |
 | `BLUE` | `syntaxKeyword` | (reserved) |
 | `PURPLE` | `customMessageLabel` | current directory |
 | `ACCENT` | `accent` | model name |
-| `GRAY` | `dim` | separators, path parents, cost, tokens, settled throughput |
+| `GRAY` | `dim` | separators, path parents, cost, tokens, settled throughput, model multiple through `4x` |
 | `THINK.*` | `thinkingOff`…`thinkingMax` | thinking-level segment |
 
 ## Install
@@ -99,6 +106,7 @@ restart pi after edits):
 ```json
 {
   "iconSet": "nerd-font",
+  "costBaseline": "deepseek-flash",
   "layout": {
     "order": ["model", "path", "git", "context", "kimi-5h", "kimi-weekly", "kimi-monthly", "cost", "tokens", "throughput"],
     "enabled": { "cost": false },
@@ -110,6 +118,9 @@ restart pi after edits):
 ```
 
 `iconSet`: `nerd-font` (default), `plain`, `ascii`, `minimal`, `emoji`.
+`costBaseline`: model id treated as `1x` (default `deepseek-flash`).
+Use `provider/id` when several providers list that id; a bare id
+prefers the priced `deepseek` entry.
 Missing/invalid fields fall back to defaults; unknown block ids are dropped
 and missing ones appended.
 

@@ -15,6 +15,7 @@
  *
  *   {
  *     "iconSet": "nerd-font" | "plain" | "ascii" | "minimal" | "emoji",
+ *     "costBaseline": "deepseek-flash",
  *     "layout": { "order": [...], "enabled": {...}, "separator": "│", ... }
  *   }
  */
@@ -34,7 +35,11 @@ import { join } from "node:path";
 
 import {
   composeStatusLine,
+  DEFAULT_COST_BASELINE,
+  findBaselineCost,
+  normaliseCostBaseline,
   paletteFromTheme,
+  readModelCostRates,
   shortenModelName,
   type RenderInputs,
 } from "./blocks.ts";
@@ -61,6 +66,8 @@ const PROMPT_PADDING = 0;
 interface StatuslineConfig {
   layout: LayoutConfig;
   iconSet: IconSet;
+  /** Model id (or `provider/id`) whose catalog price is `1x`. */
+  costBaseline: string;
 }
 
 function configPath(): string {
@@ -71,6 +78,7 @@ function loadConfig(): StatuslineConfig {
   const fallback: StatuslineConfig = {
     layout: cloneDefaultLayout(),
     iconSet: DEFAULT_ICON_SET,
+    costBaseline: DEFAULT_COST_BASELINE,
   };
   try {
     const path = configPath();
@@ -79,6 +87,7 @@ function loadConfig(): StatuslineConfig {
     return {
       layout: normaliseLayoutConfig(raw?.layout),
       iconSet: isIconSet(raw?.iconSet) ? raw.iconSet : DEFAULT_ICON_SET,
+      costBaseline: normaliseCostBaseline(raw?.costBaseline),
     };
   } catch {
     return fallback;
@@ -138,6 +147,12 @@ function renderStatusContent(
   const git = getGitStatus(ctx.cwd);
 
   const model = ctx.model as Model<any> | undefined;
+  let baselineCost: ReturnType<typeof findBaselineCost> = null;
+  try {
+    baselineCost = findBaselineCost(ctx.modelRegistry.getAll(), config.costBaseline);
+  } catch {
+    baselineCost = null;
+  }
   const providerName =
     typeof model?.provider === "string" ? model.provider.toLowerCase() : "";
   const isKimi = providerName.includes("kimi");
@@ -167,6 +182,8 @@ function renderStatusContent(
     kimiUsage: isKimi ? getKimiUsage() : null,
     goUsage: isOpenCodeGo ? getGoUsage() : null,
     cursorUsage: isCursorBridge ? getCursorUsage() : null,
+    modelCost: readModelCostRates(model?.cost),
+    baselineCost,
     iconSet: config.iconSet,
     layout: config.layout,
   };

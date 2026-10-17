@@ -135,6 +135,143 @@ export function formatCost(cost: number): string {
   return cost.toFixed(2);
 }
 
+/**
+ * USD per million tokens for one model. Same shape pi stores on
+ * `model.cost` (`input`, `output`, `cacheRead`, `cacheWrite`).
+ * Tiers are ignored: the badge uses the base rates.
+ */
+export interface ModelCostRates {
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+}
+
+/** Model id whose price is `1x`. Override via `costBaseline` in the JSON config. */
+export const DEFAULT_COST_BASELINE = "deepseek-flash";
+
+/**
+ * Share of a typical coding turn used to turn a price card into one rate.
+ * Cache reads dominate a live session, so they carry most of the weight.
+ */
+const COST_MIX = { input: 0.1, output: 0.05, cacheRead: 0.85 } as const;
+
+function rateComponent(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+/** Copy the four base rates off a model cost object. Missing fields count as 0. */
+export function readModelCostRates(
+  cost: Partial<ModelCostRates> | null | undefined,
+): ModelCostRates | null {
+  if (!cost || typeof cost !== "object") return null;
+  return {
+    input: rateComponent(cost.input),
+    output: rateComponent(cost.output),
+    cacheRead: rateComponent(cost.cacheRead),
+    cacheWrite: rateComponent(cost.cacheWrite),
+  };
+}
+
+/**
+ * Accept a model id, or `provider/id` when the id is listed more than
+ * once. Anything else falls back to {@link DEFAULT_COST_BASELINE}.
+ */
+export function normaliseCostBaseline(value: unknown): string {
+  if (typeof value !== "string") return DEFAULT_COST_BASELINE;
+  const trimmed = value.trim();
+  if (trimmed.length === 0 || trimmed.length > 128) return DEFAULT_COST_BASELINE;
+  if (/[\s\u0000-\u001f]/.test(trimmed)) return DEFAULT_COST_BASELINE;
+  return trimmed;
+}
+
+/**
+ * Price of one typical turn, in USD per million tokens.
+ * A listed `cacheRead` of 0 while input is priced means "no cache
+ * discount", so cache reads are charged at the input rate. Returns
+ * null when every component is zero, or when the mix itself is zero.
+ */
+export function blendedCostRate(cost: ModelCostRates | null | undefined): number | null {
+  if (!cost) return null;
+  const input = cost.input;
+  const output = cost.output;
+  const cacheRead = cost.cacheRead;
+  const cacheWrite = cost.cacheWrite;
+  if (input === 0 && output === 0 && cacheRead === 0 && cacheWrite === 0) return null;
+  const effectiveCacheRead = cacheRead > 0 ? cacheRead : input;
+  const rate =
+    COST_MIX.input * input + COST_MIX.output * output + COST_MIX.cacheRead * effectiveCacheRead;
+  return rate > 0 ? rate : null;
+}
+
+export interface CostRatio {
+  /** Rounded multiplier, e.g. `10` for `10x`. */
+  value: number;
+  /** Display label, e.g. `10x` or `0.5x`. */
+  label: string;
+}
+
+/** Round a positive ratio to one significant figure (`0.5`, `4`, `10`, `20`). */
+export function roundToOneSigFig(n: number): number {
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  const exp = Math.floor(Math.log10(n));
+  const mag = 10 ** exp;
+  return Math.round(n / mag) * mag;
+}
+
+/**
+ * How many times more expensive `model` is than `baseline` on
+ * {@link blendedCostRate}, rounded to one significant figure.
+ * Null when either side has no usable price.
+ */
+export function modelCostRatio(
+  model: ModelCostRates | null | undefined,
+  baseline: ModelCostRates | null | undefined,
+): CostRatio | null {
+  const modelRate = blendedCostRate(model);
+  const baselineRate = blendedCostRate(baseline);
+  if (modelRate === null || baselineRate === null) return null;
+  const value = Number(roundToOneSigFig(modelRate / baselineRate).toPrecision(1));
+  if (!Number.isFinite(value) || value <= 0) return null;
+  return { value, label: `${value}x` };
+}
+
+export interface PricedModel {
+  id: string;
+  provider: string;
+  cost?: Partial<ModelCostRates> | null;
+}
+
+/**
+ * Resolve the baseline model's rates from the catalog.
+ * `provider/id` pins one entry. A bare id prefers the `deepseek`
+ * provider when that entry is priced, otherwise the first priced
+ * match in provider-name order.
+ */
+export function findBaselineCost(
+  models: readonly PricedModel[],
+  spec: string,
+): ModelCostRates | null {
+  const usable = models.filter(
+    (m) => typeof m?.id === "string" && typeof m?.provider === "string",
+  );
+  const exact = usable.find((m) => `${m.provider}/${m.id}` === spec);
+  const pool = exact ? [exact] : usable.filter((m) => m.id === spec);
+  if (pool.length === 0) return null;
+  if (exact) return readModelCostRates(exact.cost);
+
+  const priced = pool.filter((m) => blendedCostRate(readModelCostRates(m.cost)) !== null);
+  const candidates = priced.length > 0 ? priced : pool;
+  const ranked = [...candidates].sort((a, b) => {
+    if (a.provider === "deepseek" && b.provider !== "deepseek") return -1;
+    if (b.provider === "deepseek" && a.provider !== "deepseek") return 1;
+    if (a.provider < b.provider) return -1;
+    if (a.provider > b.provider) return 1;
+    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+  });
+  return readModelCostRates(ranked[0].cost);
+}
+
 export function shortenModelName(model: { id?: string; name?: string } | undefined): string {
   let name = model?.name || model?.id || "no-model";
   if (name.startsWith("Claude ")) name = name.slice(7);
@@ -234,6 +371,11 @@ export interface RenderInputs {
   /** Cursor subscription usage meters; null when the active model
    *  is not served by the Cursor bridge or no snapshot has loaded. */
   cursorUsage: CursorUsageSnapshot | null;
+  /** Active model's base rates; null when the model has no cost card. */
+  modelCost: ModelCostRates | null;
+  /** Baseline model's base rates (default `deepseek-flash`); null when
+   *  that model is not in the catalog. */
+  baselineCost: ModelCostRates | null;
   iconSet: IconSet;
   layout: LayoutConfig;
 }
@@ -245,15 +387,59 @@ export type BlockRenderer = (inputs: RenderInputs) => string;
 // ─────────────────────────────────────────────────────────────────────
 
 /**
- * `model` block — icon + display name, with an optional inline
- * thinking-level segment attached when (a) the active model is
- * reasoning-capable and (b) `layout.model.showThinking === true`.
- * Thinking lives inside this block on purpose: it's logically tied to
- * the model and never gets its own separator.
+ * True when a Kimi, OpenCode Go, or Cursor quota block will actually
+ * render. Those catalog prices are list rates; the quota bar is the
+ * meter, so the cost multiple stays off while a bar is on screen.
+ */
+function quotaBarsShowing(inputs: RenderInputs): boolean {
+  const on = inputs.layout.enabled;
+  const kimi = inputs.kimiUsage;
+  if (kimi && ((on["kimi-5h"] && kimi.fiveHour) || (on["kimi-weekly"] && kimi.weekly))) {
+    return true;
+  }
+  const go = inputs.goUsage;
+  if (
+    go &&
+    ((on["go-5h"] && go.rolling) ||
+      (on["go-weekly"] && go.weekly) ||
+      (on["go-monthly"] && go.monthly))
+  ) {
+    return true;
+  }
+  const cursor = inputs.cursorUsage;
+  if (
+    cursor &&
+    ((on["cursor-total"] && cursor.total) ||
+      (on["cursor-auto"] && cursor.auto) ||
+      (on["cursor-api"] && cursor.api))
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/** Dim through 4x, warning through 20x, error above that. */
+function costRatioColor(value: number, palette: Palette): string {
+  if (value > 20) return palette.ERROR;
+  if (value > 4) return palette.WARNING;
+  return palette.GRAY;
+}
+
+/**
+ * `model` block — icon + display name, then the cost multiple versus
+ * the baseline (no brackets; the context bar already uses those),
+ * then an optional inline thinking-level segment when (a) the active
+ * model is reasoning-capable and (b) `layout.model.showThinking === true`.
+ * The multiple and the thinking level both live inside this block:
+ * they are tied to the model and never get their own separator.
  */
 const renderModel: BlockRenderer = (inputs) => {
   const p = inputs.palette;
-  const head = `${p.ACCENT}${resolveIcon(inputs.iconSet, "model")} ${inputs.modelName}${p.RESET}`;
+  let head = `${p.ACCENT}${resolveIcon(inputs.iconSet, "model")} ${inputs.modelName}${p.RESET}`;
+  if (!quotaBarsShowing(inputs)) {
+    const ratio = modelCostRatio(inputs.modelCost, inputs.baselineCost);
+    if (ratio) head += ` ${costRatioColor(ratio.value, p)}${ratio.label}${p.RESET}`;
+  }
   if (!inputs.modelReasoning || !inputs.layout.model.showThinking) return head;
   const label = resolveThinkingLabel(inputs.thinkingLevel, inputs.thinkingLevelMap);
   const icon = resolveIcon(inputs.iconSet, "thinking");
