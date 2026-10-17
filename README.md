@@ -21,9 +21,8 @@ Blocks (left to right, all auto-hide when irrelevant):
   the baseline (default `deepseek-flash`): 10% fresh input, 5% output,
   85% cache read, rounded to one significant figure (`Grok 4.7 10x`).
   A catalog `cacheRead` of 0 is charged at the input price. Hidden when
-  the model is unpriced, and while a Kimi, OpenCode Go, or Cursor quota
-  bar is showing. Dim through `4x`, warning through `20x`, error above
-  that. Thinking colors use the theme's `thinkingOff`…`thinkingMax`
+  the model is unpriced. Dim through `4x`, warning through `20x`, error
+  above that. Thinking colors use the theme's `thinkingOff`…`thinkingMax`
   tokens.
 - **Path** — trailing segments of `cwd` (directory name only by
   default), current directory accented. `layout.path.segments` controls

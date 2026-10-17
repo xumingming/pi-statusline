@@ -581,7 +581,7 @@ test("cost multiple stays when thinking is hidden, and hides with no price", () 
   assert.ok(!unpriced.includes("x</>"), "no multiple label");
 });
 
-test("cost multiple hides while a subscription quota bar is showing", () => {
+test("cost multiple stays while a subscription quota bar is showing", () => {
   const layout = cloneDefaultLayout();
   const priced = {
     modelName: "Kimi K3",
@@ -600,7 +600,7 @@ test("cost multiple hides while a subscription quota bar is showing", () => {
     }),
   );
   assert.ok(kimi.includes("5h"), "quota bar is showing");
-  assert.ok(!kimi.includes("x</>"), "no multiple beside a kimi bar");
+  assert.match(kimi, /<warning>10x<\/>/, "multiple beside a kimi bar");
 
   const kimiMonthly = composeStatusLine(
     layout,
@@ -614,7 +614,7 @@ test("cost multiple hides while a subscription quota bar is showing", () => {
     }),
   );
   assert.ok(kimiMonthly.includes("mo"), "monthly quota bar is showing");
-  assert.ok(!kimiMonthly.includes("x</>"), "no multiple beside a kimi monthly bar");
+  assert.match(kimiMonthly, /<warning>10x<\/>/, "multiple beside a kimi monthly bar");
 
   const go = composeStatusLine(
     layout,
@@ -628,7 +628,7 @@ test("cost multiple hides while a subscription quota bar is showing", () => {
       },
     }),
   );
-  assert.ok(!go.includes("10x"), "no multiple beside a go bar");
+  assert.match(go, /<warning>10x<\/>/, "multiple beside a go bar");
 
   const cursor = composeStatusLine(
     layout,
@@ -638,26 +638,6 @@ test("cost multiple hides while a subscription quota bar is showing", () => {
       cursorUsage: { total: { label: "cur", percent: 12 }, auto: null, api: null },
     }),
   );
-  assert.ok(!cursor.includes("10x"), "no multiple beside a cursor bar");
-
-  const disabled = normaliseLayoutConfig({
-    enabled: { "kimi-5h": false, "kimi-weekly": false, "kimi-monthly": false } as Record<
-      BlockId,
-      boolean
-    >,
-  });
-  const fallback = composeStatusLine(
-    disabled,
-    makeInputs({
-      ...priced,
-      layout: disabled,
-      kimiUsage: {
-        weekly: { label: "wk", used: 9, limit: 100 },
-        fiveHour: { label: "5h", used: 43, limit: 100 },
-        monthly: { label: "mo", used: 4, limit: 100 },
-      },
-    }),
-  );
-  assert.ok(!fallback.includes("43%"), "quota bars disabled");
-  assert.match(fallback, /<warning>10x<\/>/, "multiple returns when the bars are off");
+  assert.ok(cursor.includes("cur"), "cursor bar is showing");
+  assert.match(cursor, /Grok 4\.7<\/> <warning>10x<\/>/, "multiple beside a cursor bar");
 });

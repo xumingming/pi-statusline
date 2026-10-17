@@ -386,43 +386,6 @@ export type BlockRenderer = (inputs: RenderInputs) => string;
 // Per-block renderers
 // ─────────────────────────────────────────────────────────────────────
 
-/**
- * True when a Kimi, OpenCode Go, or Cursor quota block will actually
- * render. Those catalog prices are list rates; the quota bar is the
- * meter, so the cost multiple stays off while a bar is on screen.
- */
-function quotaBarsShowing(inputs: RenderInputs): boolean {
-  const on = inputs.layout.enabled;
-  const kimi = inputs.kimiUsage;
-  if (
-    kimi &&
-    ((on["kimi-5h"] && kimi.fiveHour) ||
-      (on["kimi-weekly"] && kimi.weekly) ||
-      (on["kimi-monthly"] && kimi.monthly))
-  ) {
-    return true;
-  }
-  const go = inputs.goUsage;
-  if (
-    go &&
-    ((on["go-5h"] && go.rolling) ||
-      (on["go-weekly"] && go.weekly) ||
-      (on["go-monthly"] && go.monthly))
-  ) {
-    return true;
-  }
-  const cursor = inputs.cursorUsage;
-  if (
-    cursor &&
-    ((on["cursor-total"] && cursor.total) ||
-      (on["cursor-auto"] && cursor.auto) ||
-      (on["cursor-api"] && cursor.api))
-  ) {
-    return true;
-  }
-  return false;
-}
-
 /** Dim through 4x, warning through 20x, error above that. */
 function costRatioColor(value: number, palette: Palette): string {
   if (value > 20) return palette.ERROR;
@@ -441,10 +404,8 @@ function costRatioColor(value: number, palette: Palette): string {
 const renderModel: BlockRenderer = (inputs) => {
   const p = inputs.palette;
   let head = `${p.ACCENT}${resolveIcon(inputs.iconSet, "model")} ${inputs.modelName}${p.RESET}`;
-  if (!quotaBarsShowing(inputs)) {
-    const ratio = modelCostRatio(inputs.modelCost, inputs.baselineCost);
-    if (ratio) head += ` ${costRatioColor(ratio.value, p)}${ratio.label}${p.RESET}`;
-  }
+  const ratio = modelCostRatio(inputs.modelCost, inputs.baselineCost);
+  if (ratio) head += ` ${costRatioColor(ratio.value, p)}${ratio.label}${p.RESET}`;
   if (!inputs.modelReasoning || !inputs.layout.model.showThinking) return head;
   const label = resolveThinkingLabel(inputs.thinkingLevel, inputs.thinkingLevelMap);
   const icon = resolveIcon(inputs.iconSet, "thinking");
