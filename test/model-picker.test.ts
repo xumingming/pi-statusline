@@ -91,7 +91,7 @@ test("visibleWindow slides to follow the selection", () => {
 test("fuzzyFilterLabels ranks like /model: ordered chars, tokens, best first", () => {
   const labels = [
     "claude-sonnet-5 [anthropic] (9x)",
-    "claude-opus-4-8 [anthropic] (20x)",
+    "claude-opus-4-8 [anthropic] (23x)",
     "grok-4.7 [xai] (10x)",
   ];
   assert.deepEqual(fuzzyFilterLabels(labels, ""), labels, "blank query keeps order");

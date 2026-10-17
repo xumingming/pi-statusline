@@ -207,21 +207,20 @@ export function blendedCostRate(cost: ModelCostRates | null | undefined): number
 export interface CostRatio {
   /** Rounded multiplier, e.g. `10` for `10x`. */
   value: number;
-  /** Display label, e.g. `10x` or `0.5x`. */
+  /** Display label, e.g. `10x`. */
   label: string;
 }
 
-/** Round a positive ratio to one significant figure (`0.5`, `4`, `10`, `20`). */
-export function roundToOneSigFig(n: number): number {
+/** Round a positive ratio to the nearest whole multiple, floored at 1
+ * so a cheaper model never reads `0x`. */
+export function roundCostMultiple(n: number): number {
   if (!Number.isFinite(n) || n <= 0) return 0;
-  const exp = Math.floor(Math.log10(n));
-  const mag = 10 ** exp;
-  return Math.round(n / mag) * mag;
+  return Math.max(1, Math.round(n));
 }
 
 /**
  * How many times more expensive `model` is than `baseline` on
- * {@link blendedCostRate}, rounded to one significant figure.
+ * {@link blendedCostRate}, rounded to the nearest whole multiple.
  * Null when either side has no usable price.
  */
 export function modelCostRatio(
@@ -231,8 +230,8 @@ export function modelCostRatio(
   const modelRate = blendedCostRate(model);
   const baselineRate = blendedCostRate(baseline);
   if (modelRate === null || baselineRate === null) return null;
-  const value = Number(roundToOneSigFig(modelRate / baselineRate).toPrecision(1));
-  if (!Number.isFinite(value) || value <= 0) return null;
+  const value = roundCostMultiple(modelRate / baselineRate);
+  if (value <= 0) return null;
   return { value, label: `${value}x` };
 }
 

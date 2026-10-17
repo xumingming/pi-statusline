@@ -474,23 +474,24 @@ const GPT_54: ModelCostRates = { input: 2.5, output: 15, cacheRead: 0.25, cacheW
 const OPUS_48: ModelCostRates = { input: 5, output: 25, cacheRead: 0.5, cacheWrite: 6.25 };
 const FABLE_5: ModelCostRates = { input: 10, output: 50, cacheRead: 1, cacheWrite: 12.5 };
 
-test("cost multiple is one significant figure versus deepseek-flash", () => {
+test("cost multiple is the whole-multiple versus deepseek-flash", () => {
   const label = (cost: ModelCostRates) => modelCostRatio(cost, FLASH)?.label;
   assert.equal(label(FLASH), "1x");
-  assert.equal(label(HAIKU_55), "0.5x");
+  // Cheaper than the baseline, but never rounds down to 0x.
+  assert.equal(label(HAIKU_55), "1x");
   assert.equal(label(GROK_43), "4x");
   assert.equal(label(GROK_47), "10x");
   assert.equal(label(SONNET_5), "9x");
-  // ~13 rounds to one significant figure, same rule as 23 -> 20 and 46 -> 50.
-  assert.equal(label(GPT_54), "10x");
-  assert.equal(label(OPUS_48), "20x");
-  assert.equal(label(FABLE_5), "50x");
+  // Real ratios: ~13, ~23 and ~46 stay distinct instead of collapsing.
+  assert.equal(label(GPT_54), "13x");
+  assert.equal(label(OPUS_48), "23x");
+  assert.equal(label(FABLE_5), "46x");
   assert.equal(modelCostRatio(GROK_47, FLASH)?.value, 10);
 });
 
 test("zero cacheRead is charged at the input rate", () => {
   const uncached = { input: 1.25, output: 2.5, cacheRead: 0, cacheWrite: 0 };
-  assert.equal(modelCostRatio(uncached, FLASH)?.label, "10x");
+  assert.equal(modelCostRatio(uncached, FLASH)?.label, "14x");
 });
 
 test("cost multiple hidden when either side is unpriced", () => {
@@ -553,10 +554,11 @@ test("cost multiple color follows 4x / 20x thresholds", () => {
       makeInputs({ modelName: name, modelCost: cost, baselineCost: FLASH, modelReasoning: false }),
     );
 
-  assert.match(at("Haiku 5.5", HAIKU_55), /<gray>\(0\.5x\)<\/>/);
+  assert.match(at("Haiku 5.5", HAIKU_55), /<gray>\(1x\)<\/>/);
   assert.match(at("Grok 4.3", GROK_43), /<gray>\(4x\)<\/>/);
-  assert.match(at("Opus 4.8", OPUS_48), /<warning>\(20x\)<\/>/);
-  assert.match(at("Fable 5", FABLE_5), /<error>\(50x\)<\/>/);
+  assert.match(at("Sonnet 5", SONNET_5), /<warning>\(9x\)<\/>/);
+  assert.match(at("Opus 4.8", OPUS_48), /<error>\(23x\)<\/>/);
+  assert.match(at("Fable 5", FABLE_5), /<error>\(46x\)<\/>/);
 });
 
 test("cost multiple stays when thinking is hidden, and hides with no price", () => {
@@ -600,7 +602,7 @@ test("cost multiple stays while a subscription quota bar is showing", () => {
     }),
   );
   assert.ok(kimi.includes("5h"), "quota bar is showing");
-  assert.match(kimi, /<warning>\(10x\)<\/>/, "multiple beside a kimi bar");
+  assert.match(kimi, /<warning>\(14x\)<\/>/, "multiple beside a kimi bar");
 
   const kimiMonthly = composeStatusLine(
     layout,
@@ -614,7 +616,7 @@ test("cost multiple stays while a subscription quota bar is showing", () => {
     }),
   );
   assert.ok(kimiMonthly.includes("mo"), "monthly quota bar is showing");
-  assert.match(kimiMonthly, /<warning>\(10x\)<\/>/, "multiple beside a kimi monthly bar");
+  assert.match(kimiMonthly, /<warning>\(14x\)<\/>/, "multiple beside a kimi monthly bar");
 
   const go = composeStatusLine(
     layout,
@@ -628,7 +630,7 @@ test("cost multiple stays while a subscription quota bar is showing", () => {
       },
     }),
   );
-  assert.match(go, /<warning>\(10x\)<\/>/, "multiple beside a go bar");
+  assert.match(go, /<warning>\(14x\)<\/>/, "multiple beside a go bar");
 
   const cursor = composeStatusLine(
     layout,
@@ -639,5 +641,5 @@ test("cost multiple stays while a subscription quota bar is showing", () => {
     }),
   );
   assert.ok(cursor.includes("cur"), "cursor bar is showing");
-  assert.match(cursor, /Grok 4\.7<\/> <warning>\(10x\)<\/>/, "multiple beside a cursor bar");
+  assert.match(cursor, /Grok 4\.7<\/> <warning>\(14x\)<\/>/, "multiple beside a cursor bar");
 });
