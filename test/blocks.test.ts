@@ -153,6 +153,30 @@ test("throughput block: live estimate marked ~, settled dim, 0/s shown when no r
   assert.ok(settled.includes("<gray>[/s] 85/s"), "settled value is dim without ~");
 });
 
+test("tokens block shows cache hit rate after the R segment", () => {
+  const layout = cloneDefaultLayout();
+  // 6300000 / (639000 + 6300000 + 0) = 90.79...% -> 90.8%
+  const line = composeStatusLine(layout, makeInputs());
+  assert.ok(line.includes("R6.3M (90.8%)"), "hit rate follows the cache-read counter");
+
+  const noToggle = normaliseLayoutConfig({
+    tokens: { input: true, output: true, cacheRead: false, cacheWrite: true },
+  });
+  const off = composeStatusLine(noToggle, makeInputs({ layout: noToggle }));
+  assert.ok(!off.includes("R6.3M"), "cacheRead sub-toggle hides the counter");
+  assert.ok(!off.includes("(90.8%)"), "hit rate hidden with the counter");
+});
+
+test("cache hit rate counts cache writes in the prompt volume", () => {
+  const layout = cloneDefaultLayout();
+  // 450000 / (30000 + 450000 + 7500) = 92.30...% -> 92.3%
+  const line = composeStatusLine(
+    layout,
+    makeInputs({ totalInput: 30000, totalCacheRead: 450000, totalCacheWrite: 7500 }),
+  );
+  assert.ok(line.includes("R450k (92.3%)"), "denominator is input + cacheRead + cacheWrite");
+});
+
 test("git block disappears outside a repo, dirty marker uses error color", () => {
   const layout = cloneDefaultLayout();
   const noRepo = composeStatusLine(layout, makeInputs({ branch: null }));
@@ -169,7 +193,7 @@ test("cost block hidden at zero, context hidden without a window", () => {
     makeInputs({ cost: 0, contextWindow: 0, current: 0 }),
   );
   assert.ok(!line.includes("$"), "no cost block");
-  assert.ok(!line.includes("%"), "no context block");
+  assert.ok(!line.includes("12%"), "no context block");
 });
 
 test("context bar shifts success -> warning -> error with fill level", () => {

@@ -599,10 +599,14 @@ const renderCost: BlockRenderer = (inputs) => {
 };
 
 /**
- * `tokens` block — `↑in ↓out R W`. Each counter is gated by both the
+ * `tokens` block — `↑in ↓out R(pct) W`. Each counter is gated by both the
  * sub-toggle in `layout.tokens.*` AND a `> 0` check, so disabling a
  * counter hides it even when usage exists. Returns "" when every
  * gated counter is empty.
+ *
+ * The percentage after `R` is the cache hit rate: cache-read tokens
+ * as a share of the full prompt volume (input + cacheRead +
+ * cacheWrite), the same formula pi's `/session` reports.
  */
 const renderTokens: BlockRenderer = (inputs) => {
   const p = inputs.palette;
@@ -610,7 +614,11 @@ const renderTokens: BlockRenderer = (inputs) => {
   const segments: string[] = [];
   if (t.input && inputs.totalInput > 0) segments.push(`↑${formatTokens(inputs.totalInput)}`);
   if (t.output && inputs.totalOutput > 0) segments.push(`↓${formatTokens(inputs.totalOutput)}`);
-  if (t.cacheRead && inputs.totalCacheRead > 0) segments.push(`R${formatTokens(inputs.totalCacheRead)}`);
+  if (t.cacheRead && inputs.totalCacheRead > 0) {
+    const prompt = inputs.totalInput + inputs.totalCacheRead + inputs.totalCacheWrite;
+    const hitRate = prompt > 0 ? ((inputs.totalCacheRead / prompt) * 100).toFixed(1) : "0.0";
+    segments.push(`R${formatTokens(inputs.totalCacheRead)} (${hitRate}%)`);
+  }
   if (t.cacheWrite && inputs.totalCacheWrite > 0) segments.push(`W${formatTokens(inputs.totalCacheWrite)}`);
   if (segments.length === 0) return "";
   return `${p.GRAY}${segments.join(" ")}${p.RESET}`;

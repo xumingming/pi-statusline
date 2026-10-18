@@ -36,7 +36,8 @@ export interface TokensSubToggles {
   input: boolean;
   /** Show `↓output` segment when output usage > 0. */
   output: boolean;
-  /** Show `R{cacheRead}` segment when cache-read usage > 0. */
+  /** Show `R{cacheRead}` segment (with cache hit rate) when
+   *  cache-read usage > 0. */
   cacheRead: boolean;
   /** Show `W{cacheWrite}` segment when cache-write usage > 0. */
   cacheWrite: boolean;
