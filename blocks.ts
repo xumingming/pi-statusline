@@ -123,13 +123,37 @@ export function shortenPath(cwd: string, segments = 1): string {
   return take === 1 ? tail[0] : `…/${tail.join("/")}`;
 }
 
+/**
+ * Compact token count. Each tier steps to the next unit before
+ * rounding would emit a 5-character form (`10.0k`, `1000k`, `10.0M`,
+ * `1000M`), so the result stays within 4 characters up through `999B`
+ * and a fixed slot can hold it.
+ */
 export function formatTokens(n: number): string {
   if (n < 1000) return `${n}`;
-  if (n < 10000) return `${(n / 1000).toFixed(1)}k`;
-  if (n < 1000000) return `${Math.round(n / 1000)}k`;
-  if (n < 10000000) return `${(n / 1000000).toFixed(1)}M`;
-  return `${Math.round(n / 1000000)}M`;
+  if (n < 9950) return `${(n / 1000).toFixed(1)}k`;
+  if (n < 999500) return `${Math.round(n / 1000)}k`;
+  if (n < 9950000) return `${(n / 1000000).toFixed(1)}M`;
+  if (n < 999500000) return `${Math.round(n / 1000000)}M`;
+  if (n < 9.95e9) return `${(n / 1e9).toFixed(1)}B`;
+  return `${Math.round(n / 1e9)}B`;
 }
+
+/** Columns for a 0–100 percentage (`9%` and `100%` share a width). */
+const PCT_COLUMNS = 3;
+/** Columns for formatTokens; see its 4-character ceiling. */
+const TOKEN_COLUMNS = 4;
+
+/** Right-align (`start`) or left-align (`end`) plain single-width text.
+ *  Longer text is kept as-is. */
+function reserveColumns(text: string, columns: number, pad: "start" | "end" = "start"): string {
+  if (text.length >= columns) return text;
+  const spaces = " ".repeat(columns - text.length);
+  return pad === "end" ? text + spaces : spaces + text;
+}
+
+/** `~` + 4-character rate + `/s`. Spare columns follow `/s`. */
+const THROUGHPUT_COLUMNS = 1 + TOKEN_COLUMNS + 2;
 
 export function formatCost(cost: number): string {
   return cost.toFixed(2);
@@ -433,7 +457,12 @@ const renderGit: BlockRenderer = (inputs) => {
   return `${p.CYAN}${inputs.branch} ${mark}`;
 };
 
-/** `context` block — `pct%: used[bar]remaining`; empty when no context window. */
+/**
+ * `context` block — `pct%: used[bar]remaining`; empty when no context
+ * window. The percent (3 columns) and both token counts (4) are
+ * right-aligned, so filling the window does not slide the bar or the
+ * blocks after it.
+ */
 const renderContext: BlockRenderer = (inputs) => {
   const p = inputs.palette;
   if (inputs.contextWindow <= 0) return "";
@@ -447,16 +476,20 @@ const renderContext: BlockRenderer = (inputs) => {
   if (pct < 0) pct = 0;
   const color = pctColorFor(pct, p);
   const bar = buildBar(pct, color, p);
+  const pctText = reserveColumns(String(pct), PCT_COLUMNS);
+  const used = reserveColumns(formatTokens(inputs.current), TOKEN_COLUMNS);
+  const left = reserveColumns(formatTokens(remaining), TOKEN_COLUMNS);
   return (
-    `${color}${pct}%${p.RESET}: ${formatTokens(inputs.current)}` +
-    `${p.GRAY}[${p.RESET}${bar}${p.GRAY}]${p.RESET}${formatTokens(remaining)}`
+    `${color}${pctText}%${p.RESET}: ${used}` +
+    `${p.GRAY}[${p.RESET}${bar}${p.GRAY}]${p.RESET}${left}`
   );
 };
 
 /**
  * Shared renderer for the Kimi usage-window blocks: a dim label, the
- * used percentage colored by fill level, and a progress bar. Returns
- * "" when the window has no usable data.
+ * used percentage colored by fill level, and a progress bar. The
+ * percentage is right-aligned in 3 columns so the bar does not shift
+ * between 9% and 100%. Returns "" when the window has no usable data.
  */
 function renderUsageWindow(row: KimiWindowUsage, palette: Palette): string {
   const p = palette;
@@ -464,8 +497,9 @@ function renderUsageWindow(row: KimiWindowUsage, palette: Palette): string {
   const pct = Math.min(100, Math.floor((Math.max(0, row.used) * 100) / row.limit));
   const color = pctColorFor(pct, p);
   const bar = buildBar(pct, color, p);
+  const pctText = reserveColumns(String(pct), PCT_COLUMNS);
   return (
-    `${p.GRAY}${row.label}${p.RESET} ${color}${pct}%${p.RESET} ` +
+    `${p.GRAY}${row.label}${p.RESET} ${color}${pctText}%${p.RESET} ` +
     `${p.GRAY}[${p.RESET}${bar}${p.GRAY}]${p.RESET}`
   );
 }
@@ -520,15 +554,18 @@ const renderKimiMonthly: BlockRenderer = (inputs) => {
  * Shared renderer for the OpenCode Go usage-window blocks: a dim
  * label, the fill percent colored by level, and a progress bar. The
  * Go API exposes the fill directly (`percent`), unlike Kimi's
- * used/limit pair, so the bar is driven by that percentage.
+ * used/limit pair, so the bar is driven by that percentage. The
+ * percentage is right-aligned in 3 columns, same as the Kimi windows,
+ * so the bar does not shift between 9% and 100%.
  */
 function renderGoWindow(row: GoWindowUsage, palette: Palette): string {
   const p = palette;
   const pct = Math.min(100, Math.max(0, Math.round(row.percent)));
   const color = pctColorFor(pct, p);
   const bar = buildBar(pct, color, p);
+  const pctText = reserveColumns(String(pct), PCT_COLUMNS);
   return (
-    `${p.GRAY}${row.label}${p.RESET} ${color}${pct}%${p.RESET} ` +
+    `${p.GRAY}${row.label}${p.RESET} ${color}${pctText}%${p.RESET} ` +
     `${p.GRAY}[${p.RESET}${bar}${p.GRAY}]${p.RESET}`
   );
 }
@@ -626,20 +663,24 @@ const renderTokens: BlockRenderer = (inputs) => {
 
 /**
  * `throughput` block — output tokens/sec for the current or last
- * response. Live estimates (chars-based, while streaming) carry a "~"
- * prefix and the accent-adjacent cyan; settled values derived from real
- * usage are dim like the other counters. Reports 0/s when there is no
- * measurable rate (idle, silent thinking, or a pure tool-call turn)
- * rather than disappearing, so the slot is always filled.
+ * response. Live estimates (chars-based, while streaming) prefix a "~"
+ * and use the accent-adjacent cyan; settled values omit it and are dim
+ * like the other counters. The whole `~rate/s` text is left-aligned in
+ * a fixed slot, with the spare columns after `/s`, so a changing rate
+ * or the streaming/settled transition does not shift the blocks to the
+ * right. Reports 0/s when there is no measurable rate (idle, silent
+ * thinking, or a pure tool-call turn) rather than disappearing.
  */
 const renderThroughput: BlockRenderer = (inputs) => {
   const t = inputs.throughput;
   if (!t) return "";
   const p = inputs.palette;
   const icon = resolveIcon(inputs.iconSet, "throughput");
-  const rate = formatTokens(Math.round(t.tokensPerSec));
-  if (t.phase === "streaming") return `${p.CYAN}${icon} ~${rate}/s${p.RESET}`;
-  return `${p.GRAY}${icon} ${rate}/s${p.RESET}`;
+  const marker = t.phase === "streaming" ? "~" : "";
+  const body = `${marker}${formatTokens(Math.round(t.tokensPerSec))}/s`;
+  const text = reserveColumns(body, THROUGHPUT_COLUMNS, "end");
+  const color = t.phase === "streaming" ? p.CYAN : p.GRAY;
+  return `${color}${icon} ${text}${p.RESET}`;
 };
 
 /** Registry consulted by `composeStatusLine`. */

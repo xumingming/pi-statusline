@@ -120,12 +120,12 @@ test("default order places cost, tokens, throughput right after git", () => {
   assert.ok(pos("master") !== -1, "git renders");
   assert.ok(pos("$2.02") !== -1, "cost renders");
   assert.ok(pos("↑639k") !== -1, "tokens render");
-  assert.ok(pos("[/s] 85/s") !== -1, "throughput renders");
+  assert.ok(pos("[/s] 85/s   ") !== -1, "throughput renders");
   assert.ok(pos("12%") !== -1, "context renders");
   assert.ok(pos("master") < pos("$2.02"), "cost right after git");
   assert.ok(pos("$2.02") < pos("↑639k"), "tokens after cost");
-  assert.ok(pos("↑639k") < pos("[/s] 85/s"), "throughput after tokens");
-  assert.ok(pos("[/s] 85/s") < pos("12%"), "context after throughput");
+  assert.ok(pos("↑639k") < pos("[/s] 85/s   "), "throughput after tokens");
+  assert.ok(pos("[/s] 85/s   ") < pos("12%"), "context after throughput");
 });
 
 test("throughput block: live estimate marked ~, settled dim, 0/s shown when no rate", () => {
@@ -138,19 +138,85 @@ test("throughput block: live estimate marked ~, settled dim, 0/s shown when no r
     layout,
     makeInputs({ throughput: { phase: "settled", tokensPerSec: 0 } }),
   );
-  assert.ok(zero.includes("<gray>[/s] 0/s</>"), "no measurable rate renders dim 0/s");
+  assert.ok(zero.includes("<gray>[/s] 0/s    </>"), "no measurable rate renders dim 0/s");
 
   const live = composeStatusLine(
     layout,
     makeInputs({ throughput: { phase: "streaming", tokensPerSec: 47.4 } }),
   );
-  assert.ok(live.includes("<cyan>[/s] ~47/s"), "live estimate uses cyan + ~ prefix");
+  assert.ok(live.includes("<cyan>[/s] ~47/s  </>"), "live estimate uses cyan + ~ prefix");
 
   const settled = composeStatusLine(
     layout,
     makeInputs({ throughput: { phase: "settled", tokensPerSec: 85.2 } }),
   );
-  assert.ok(settled.includes("<gray>[/s] 85/s"), "settled value is dim without ~");
+  assert.ok(settled.includes("<gray>[/s] 85/s   </>"), "settled value is dim without ~");
+});
+
+function stripTags(line: string): string {
+  return line.replace(/<[^>]*>/g, "");
+}
+
+// The throughput block repaints while a response streams. Its rate and the
+// streaming "~" must stay inside a fixed slot, or the blocks to the right
+// shift on every paint.
+test("throughput slot does not move the blocks to its right", () => {
+  const layout = cloneDefaultLayout();
+  const anchor = (tokensPerSec: number, phase: "streaming" | "settled") => {
+    const line = stripTags(
+      composeStatusLine(
+        layout,
+        makeInputs({ throughput: { phase, tokensPerSec } }),
+      ),
+    );
+    const at = line.indexOf("12%");
+    assert.ok(at > 0, `context still renders for ${phase} ${tokensPerSec}`);
+    return at;
+  };
+
+  const settledZero = anchor(0, "settled");
+  for (const [rate, phase] of [
+    [9, "streaming"],
+    [47.4, "streaming"],
+    [85.2, "settled"],
+    [128, "streaming"],
+    [999, "settled"],
+    [1500, "streaming"],
+  ] as const) {
+    assert.equal(anchor(rate, phase), settledZero, `${phase} ${rate}`);
+  }
+});
+
+// Context and quota percents sit beside progress bars. A value that grows
+// from 9 to 10, or a token count that crosses 1k, would slide those bars.
+test("context block keeps a stable width as the window fills", () => {
+  const layout = cloneDefaultLayout();
+  const window = 1_033_000; // threshold = 1_000_000 after the 33k buffer
+  const widthAt = (current: number) =>
+    stripTags(
+      composeStatusLine(layout, makeInputs({ contextWindow: window, current })),
+    ).length;
+  const baseline = widthAt(0);
+  for (const current of [9, 500, 9_994, 12_000, 127_000, 500_000, 1_000_000]) {
+    assert.equal(widthAt(current), baseline, `current ${current}`);
+  }
+});
+
+test("usage percent keeps a stable width from 0 to 100", () => {
+  const layout = cloneDefaultLayout();
+  const widthAt = (percent: number) =>
+    stripTags(
+      composeStatusLine(
+        layout,
+        makeInputs({
+          goUsage: { rolling: { label: "5h", percent }, weekly: null, monthly: null },
+        }),
+      ),
+    ).length;
+  const baseline = widthAt(0);
+  for (const percent of [1, 9, 43, 100]) {
+    assert.equal(widthAt(percent), baseline, `percent ${percent}`);
+  }
 });
 
 test("tokens block shows cache hit rate after the R segment", () => {
@@ -202,9 +268,9 @@ test("context bar shifts success -> warning -> error with fill level", () => {
   const at = (pct: number) =>
     composeStatusLine(layout, makeInputs({ contextWindow: window, current: pct * 10000 }));
 
-  assert.ok(at(50).includes("<success>50%"), "low fill is success-colored");
-  assert.ok(at(70).includes("<warning>70%"), "mid fill is warning-colored");
-  assert.ok(at(90).includes("<error>90%"), "high fill is error-colored");
+  assert.ok(at(50).includes("<success> 50%"), "low fill is success-colored");
+  assert.ok(at(70).includes("<warning> 70%"), "mid fill is warning-colored");
+  assert.ok(at(90).includes("<error> 90%"), "high fill is error-colored");
 });
 
 test("block visibility and ordering are honored", () => {
@@ -242,8 +308,8 @@ test("kimi usage blocks hidden without a snapshot, shown with data", () => {
     monthly: null,
   };
   const line = composeStatusLine(layout, makeInputs({ kimiUsage: usage }));
-  assert.ok(line.includes("<gray>5h</> <success>43%</>"), "5h block with low fill");
-  assert.ok(line.includes("<gray>wk</> <success>9%</>"), "weekly block with low fill");
+  assert.ok(line.includes("<gray>5h</> <success> 43%</>"), "5h block with low fill");
+  assert.ok(line.includes("<gray>wk</> <success>  9%</>"), "weekly block with low fill");
   assert.ok(line.includes("\u2593"), "progress bar rendered");
 });
 
@@ -257,9 +323,9 @@ test("kimi usage bars shift success -> warning -> error with fill level", () => 
       }),
     );
 
-  assert.ok(at(50).includes("<success>50%"), "low fill is success-colored");
-  assert.ok(at(70).includes("<warning>70%"), "mid fill is warning-colored");
-  assert.ok(at(90).includes("<error>90%"), "high fill is error-colored");
+  assert.ok(at(50).includes("<success> 50%"), "low fill is success-colored");
+  assert.ok(at(70).includes("<warning> 70%"), "mid fill is warning-colored");
+  assert.ok(at(90).includes("<error> 90%"), "high fill is error-colored");
 });
 
 test("kimi weekly block shows when the window ends", () => {
@@ -315,7 +381,7 @@ test("kimi usage blocks can be disabled via layout", () => {
   const line = composeStatusLine(layout, makeInputs({ kimiUsage: usage, layout }));
   assert.ok(!line.includes("43%"), "5h block disabled");
   assert.ok(!line.includes("9%"), "weekly block disabled");
-  assert.ok(line.includes("<gray>mo</> <success>4%</>"), "monthly block still enabled");
+  assert.ok(line.includes("<gray>mo</> <success>  4%</>"), "monthly block still enabled");
 });
 
 test("kimi monthly block shows fill and end time", () => {
@@ -333,7 +399,7 @@ test("kimi monthly block shows fill and end time", () => {
     monthly: { label: "mo", used: 4, limit: 100, resetTime },
   };
   const line = composeStatusLine(layout, makeInputs({ kimiUsage: usage }));
-  assert.ok(line.includes("<gray>mo</> <success>4%</>"), "monthly block with low fill");
+  assert.ok(line.includes("<gray>mo</> <success>  4%</>"), "monthly block with low fill");
   assert.ok(
     line.includes(`<gray>ends ${expected}</>`),
     "monthly block shows local reset time",
@@ -360,9 +426,9 @@ test("go usage bars appear only with an opencode-go snapshot and only when enabl
     monthly: { label: "mo", percent: 0 },
   };
   const line = composeStatusLine(layout, makeInputs({ goUsage: usage }));
-  assert.ok(line.includes("<gray>5h</> <success>1%</>"), "5h block with low fill");
-  assert.ok(line.includes("<gray>wk</> <success>0%</>"), "weekly block with low fill");
-  assert.ok(line.includes("<gray>mo</> <success>0%</>"), "monthly block rendered");
+  assert.ok(line.includes("<gray>5h</> <success>  1%</>"), "5h block with low fill");
+  assert.ok(line.includes("<gray>wk</> <success>  0%</>"), "weekly block with low fill");
+  assert.ok(line.includes("<gray>mo</> <success>  0%</>"), "monthly block rendered");
   assert.ok(line.includes("\u2593"), "progress bar rendered");
 });
 
@@ -374,9 +440,9 @@ test("go usage bars shift success -> warning -> error with fill level", () => {
       makeInputs({ goUsage: { rolling: { label: "5h", percent }, weekly: null, monthly: null } }),
     );
 
-  assert.ok(at(50).includes("<success>50%"), "low fill is success-colored");
-  assert.ok(at(70).includes("<warning>70%"), "mid fill is warning-colored");
-  assert.ok(at(90).includes("<error>90%"), "high fill is error-colored");
+  assert.ok(at(50).includes("<success> 50%"), "low fill is success-colored");
+  assert.ok(at(70).includes("<warning> 70%"), "mid fill is warning-colored");
+  assert.ok(at(90).includes("<error> 90%"), "high fill is error-colored");
 });
 
 test("go weekly block shows when the window ends", () => {
@@ -462,7 +528,7 @@ test("go and cursor usage bars round fractional percents to integers", () => {
       goUsage: { rolling: { label: "5h", percent: frac }, weekly: null, monthly: null },
     }),
   );
-  assert.ok(goLine.includes("<success>1%"), "go bar shows rounded percent");
+  assert.ok(goLine.includes("<success>  1%"), "go bar shows rounded percent");
 
   const cursorLine = composeStatusLine(
     layout,
@@ -470,15 +536,25 @@ test("go and cursor usage bars round fractional percents to integers", () => {
       cursorUsage: { total: { label: "cur", percent: frac }, auto: null, api: null },
     }),
   );
-  assert.ok(cursorLine.includes("<success>1%"), "cursor bar shows rounded percent");
+  assert.ok(cursorLine.includes("<success>  1%"), "cursor bar shows rounded percent");
   assert.ok(!cursorLine.includes("1.362"), "fractional digits not shown in percent");
 });
 
 test("format helpers", () => {
   assert.equal(formatTokens(999), "999");
   assert.equal(formatTokens(1500), "1.5k");
+  assert.equal(formatTokens(9949), "9.9k");
+  assert.equal(formatTokens(9950), "10k");
+  assert.equal(formatTokens(9999), "10k");
   assert.equal(formatTokens(639000), "639k");
+  assert.equal(formatTokens(999499), "999k");
+  assert.equal(formatTokens(999500), "1.0M");
+  assert.equal(formatTokens(1000000), "1.0M");
   assert.equal(formatTokens(6300000), "6.3M");
+  assert.equal(formatTokens(9949999), "9.9M");
+  assert.equal(formatTokens(9950000), "10M");
+  assert.equal(formatTokens(999499999), "999M");
+  assert.equal(formatTokens(999500000), "1.0B");
   assert.equal(shortenPath("/Users/abei/Code/spark"), "spark");
   assert.equal(shortenPath("/tmp/x"), "x");
   assert.equal(shortenPath("/tmp/x", 3), "/tmp/x");
