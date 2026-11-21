@@ -10,7 +10,7 @@ Renders a compact one-line status row above the editor, with the editor's
 top/bottom borders stripped so the two visually merge:
 
 ```
-─ 🤖 Kimi K3 🧠 high │ spark │ master ✓ │ $2.02 │ ↑639k ↓88k R6.3M │  12%: 127k[▓░░░░░░░░░]893k │ 5h  43%[▓▓▓▓░░░░░░] │ wk   9%[▓░░░░░░░░░] │ mo   4%[▓░░░░░░░░░]
+─ 🤖 Kimi K3 🧠 high │ spark │ master ✓ │ $2.02 │ ↑639k ↓88k R6.3M │ 12%: 127k[▓░░░░░░░░░]893k │ 5h 43%[▓▓▓▓░░░░░░] │ wk 9%[▓░░░░░░░░░] │ mo 4%[▓░░░░░░░░░]
 ```
 
 Blocks (left to right, all auto-hide when irrelevant):
@@ -35,29 +35,23 @@ Blocks (left to right, all auto-hide when irrelevant):
   providers only report usage at the end; once the response finishes
   the real `usage.output` over the streaming time is shown (dim, no
   `~`) between responses, kept as a fallback when a later response ends
-  with no measurable output. The text is left-aligned in a fixed slot
-  and the spare columns sit after `/s`, so the blocks to the right stay
-  put while the number changes. Reports dim `0/s` when nothing is
+  with no measurable output. Reports dim `0/s` when nothing is
   measurable yet (idle, silent thinking, or pure tool-call turns).
 - **Context** — percentage of the usable context window before
   autocompaction (33k buffer reserved), with a progress bar that shifts
-  success → warning → error as it fills. The percent is right-aligned
-  in 3 columns and both token counts in 4, so the bar does not slide
-  as the window fills.
+  success → warning → error as it fills.
 - **Kimi 5h / Kimi weekly / Kimi monthly** — Kimi Coding subscription
   quota windows (short rate-limit window, weekly window, monthly quota),
   shown only when the active model is served by Kimi. Polled from the
   `/usages` API once a minute using the `kimi-coding` OAuth token from
   `~/.pi/agent/auth.json`; the weekly and monthly blocks also show when
-  their window ends. The fill percent is right-aligned in 3 columns so
-  the bar does not shift.
+  their window ends.
 - **Go 5h / Go weekly / Go monthly** — OpenCode Go plan quota windows
   (rolling 5h, weekly, monthly), shown only when the active model is
   served by the `opencode-go` provider. Polled from the `/usage` API
   once a minute using the `opencode-go` API key from
   `~/.pi/agent/auth.json`; the weekly block also shows when the window
-  ends. The fill percent is right-aligned in 3 columns so the bar does
-  not shift.
+  ends.
 - **Cursor total / Cursor auto / Cursor api** — Cursor subscription
   usage meters (billing cycle total, Auto + Composer pool, API pool),
   shown only when the active model is served by the `cursor-opencode`
@@ -66,8 +60,7 @@ Blocks (left to right, all auto-hide when irrelevant):
   Cursor OAuth/API credential pi stores in `~/.pi/agent/auth.json`;
   the total block also shows when the billing cycle ends. These are
   unofficial endpoints — plans without metered data or upstream API
-  changes may leave the blocks hidden. The fill percent is right-aligned
-  in 3 columns so the bar does not shift.
+  changes may leave the blocks hidden.
 
 ## What changed vs. the original
 
